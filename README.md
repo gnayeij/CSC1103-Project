@@ -19,5 +19,7 @@ How it Works:
 
 - As the command-line to compile can be quite long, I created a powershell script file ("run.ps1") that we can just run to help us compile easier instead of typing it out everytime we want to compile. (just run .\run.ps1 in any terminal to compile.)
 
+- If you get unauthorizedAccess error when running the .ps1 file, open up a powershell terminal and run this: "Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser" 
+
 To note: 
 - I add the game.exe file into .gitignore.

@@ -1,14 +1,14 @@
 # CSC1103-Project
 Setup Raylib Guide: 
-1. Download raylib latest release from the github repo (https://github.com/raysan5/raylib/releases)
+1. Download raylib latest release from the github repo (https://github.com/raysan5/raylib/releases), download the latest release's "source.zip".
 
-2. Download w64devkit-x.xx.x.zip from https://github.com/skeeto/w64devkit
+2. Download w64devkit-x.xx.x.zip from https://github.com/skeeto/w64devkit, download "w64devkit-x64-2.0.0.exe".
 
-3. Run the installer file and there should be a new w64devkit folder.
+3. Run the w64devkit.exe installer file and there should prompt you to choose a destination extraction folder.
 
 4. Navigate to the w64devkit folder and run w64devkit.exe. It should open up a console. It is a linux-based console.
 
-5. Inside the console, navigate to the folder where the extracted raylib folder is located. Once at the dir, run “mingw32-make PLATFORM=PLATFORM_DESKTOP” 
+5. Inside the console, navigate to the folder where the extracted raylib folder is located and cd to /src. Once at the dir (/src), run “mingw32-make PLATFORM=PLATFORM_DESKTOP” 
 
 6. Refer to https://youtu.be/HPDLTQ4J_zQ?t=354 , to learn how to setup VSCode Environment to code and compile using raylib locally.
 

@@ -12,6 +12,8 @@ Setup Raylib Guide:
 
 6. Refer to https://youtu.be/HPDLTQ4J_zQ?t=354 , to learn how to setup VSCode Environment to code and compile using raylib locally.
 
+7. For the "include" & "lib" folder. Go to your raylib/src folder and copy the files, "raylib.h" and "libraylib.a" and paste into their own folders on the repo respectively. 
+
 How it Works:
 - Develop code in main.c, then compile locally using gcc. 
 

@@ -1,6 +1,5 @@
-// file_reader.h
-#ifndef FILE_READER_H
-#define FILE_READER_H
+#ifndef DATA_READER_H
+#define DATA_READER_H
 
 #include <stddef.h>
 

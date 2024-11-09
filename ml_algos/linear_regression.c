@@ -1,14 +1,25 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "data_reader.h"
+#include "dataset_loader.h"
+#include "move_data.h"
+
+#define DATASET_SIZE 958
 
 int main()
 {
-    char **data = read_game_data();
-    printf("Data from file:\n");
-    for (int i = 0; i < 1000; i++)
+    MoveData dataset[DATASET_SIZE];
+    MoveData *ptr = dataset;
+
+    if (load_dataset(ptr) != 0)
     {
-        printf("%s\n", data[i]);
+        fprintf(stderr, "Dataset loading failed.\n");
+        return 1;
+    }
+
+    printf("Data from file:\n");
+    for (int i = 0; i < DATASET_SIZE; i++)
+    {
+        printf("Game Data %d: %s\n", i, dataset[i].board);
     }
 
     return 0;

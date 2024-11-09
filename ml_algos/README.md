@@ -29,17 +29,23 @@ Split the data into 80:20 ratio of training to testing data.
 #### Using the game data reader function:
 
 1. Include it at the top of the file.
-2. Load the data by calling the `read_game_data` function.
+2. Load the data by calling the `load_dataset` function.
 3. Compile by using the command as such:
-   `gcc -o {EXECUTABLE_NAME} {YOUR C FILE NAME} data_reader.c`
+   `gcc -o {EXECUTABLE_NAME} {YOUR C FILE NAME} dataset_loader.c move_data.h`
 
 ```c
-#include  "data_reader.h"
+#include "dataset_loader.h"
+#include "move_data.h"
 int  main()
 {
-	char **data = read_game_data();
-	\\use data here
-	return 0
+	MoveData dataset[DATASET_SIZE];
+    MoveData *ptr = dataset;
+
+    if (load_dataset(ptr) != 0)
+    {
+        fprintf(stderr, "Dataset loading failed.\n");
+        return 1;
+    }
 }
 ```
 

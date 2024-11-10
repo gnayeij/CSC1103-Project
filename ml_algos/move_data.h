@@ -8,6 +8,6 @@
 typedef struct movedata
 {
     char board[9]; // player 1 is 'X', player 2 is 'O', blank is 'b'
-    int outcome;   // 1 for win, 0 for lose
+    int outcome;   //
 } MoveData;
 #endif

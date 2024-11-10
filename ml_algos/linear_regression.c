@@ -72,18 +72,18 @@ void board_to_features(char board[BOARD_SIZE], double features[BOARD_SIZE])
 
 double predict(double features[BOARD_SIZE], double weights[BOARD_SIZE], double bias)
 {
-    double max_score = -1e9; // Initialize with a very low value
+    double max_score = -1e9;
     int best_move = -1;
 
     for (int i = 0; i < 9; i++)
     {
-        // Skip if the position is already occupied
+        // skip if its not blank
         if (features[i] != 0)
         {
             continue;
         }
 
-        // Calculate the prediction score for this position based on all features
+        // calculate score based off all weights and features here
         double score = bias;
         for (int j = 0; j < 9; j++)
         {

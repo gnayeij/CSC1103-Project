@@ -1,5 +1,7 @@
-game.exe
-
 include/
 
 lib/
+
+.vscode
+
+*.exe

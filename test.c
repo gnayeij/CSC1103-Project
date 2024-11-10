@@ -105,8 +105,8 @@ void free_legal_moves(LegalMoves* legal_moves) {
 int main() {
     // Create a sample board state
     int board[BOARD_SIZE][BOARD_SIZE] = {
-        {1, 2, 2},
-        {1, 0, 2},
+        {2, 2, 2},
+        {2, 1, 2},
         {2, 2, 2}
     };
     

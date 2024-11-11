@@ -26,7 +26,7 @@ typedef struct {
 
 // function prototypes
 void initializeBoard(char board[BOARD_SIZE][BOARD_SIZE]);
-void drawBoard(char board[BOARD_SIZE][BOARD_SIZE]);
+void drawBoard(char board[BOARD_SIZE][BOARD_SIZE], Vector2 mousePos);
 bool makeMove(char board[BOARD_SIZE][BOARD_SIZE], int row, int col, char player);
 bool checkWin(char board[BOARD_SIZE][BOARD_SIZE], char player);
 bool isBoardFull(char board[BOARD_SIZE][BOARD_SIZE]);
@@ -72,6 +72,8 @@ int main(void) {
     initializeBoard(board);
 
     while (!WindowShouldClose()) {
+        Vector2 mousePos = GetMousePosition();
+
         // update
         switch (currentState) {
             case LOBBY:
@@ -105,7 +107,6 @@ int main(void) {
                 // game logic
                 if (!gameOver) {
                     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-                        Vector2 mousePos = GetMousePosition();
                         int row = mousePos.y / CELL_SIZE;
                         int col = mousePos.x / CELL_SIZE;
 
@@ -134,7 +135,7 @@ int main(void) {
                 break;
 
             case GAME_TWO_PLAYER:
-                drawBoard(board);
+                drawBoard(board, mousePos);
 
                 // draw game status
                 if (gameOver) {
@@ -208,7 +209,22 @@ void initializeBoard(char board[BOARD_SIZE][BOARD_SIZE]) {
     }
 }
 
-void drawBoard(char board[BOARD_SIZE][BOARD_SIZE]) {
+void drawBoard(char board[BOARD_SIZE][BOARD_SIZE], Vector2 mousePos) {
+    int hoverRow = mousePos.y / CELL_SIZE;
+    int hoverCol = mousePos.x / CELL_SIZE;
+
+    // draw cells for hover effects
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
+            Rectangle cellRect = { j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE };
+            
+            // hover effect
+            if (i == hoverRow && j == hoverCol && board[i][j] == ' ') {
+                DrawRectangleRec(cellRect, (Color){ 220, 220, 200, 255 }); // grid changes colour when hovering
+            }
+        }
+    }
+
     // draw grid lines
     for (int i = 1; i < BOARD_SIZE; i++) {
         DrawLine(i * CELL_SIZE, 0, i * CELL_SIZE, SCREEN_HEIGHT, BLACK);

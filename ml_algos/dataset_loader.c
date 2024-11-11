@@ -4,12 +4,9 @@
 #include "dataset_loader.h"
 #include "move_data.h"
 
-#define DATASET_LENGTH 958
-#define DATA_FILE "tic-tac-toe.txt"
-
-int load_dataset(MoveData *dataset)
+int load_dataset(MoveData *dataset, char file_name[], int DATASET_LENGTH)
 {
-    FILE *file = fopen(DATA_FILE, "r");
+    FILE *file = fopen(file_name, "r");
     if (!file)
     {
         perror("Error opening file");

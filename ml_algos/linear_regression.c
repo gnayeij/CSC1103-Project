@@ -1,26 +1,14 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include "dataset_loader.h"
-#include "move_data.h"
-
-#define DATASET_SIZE 958
+#include "linearRegressionModel.h"
 
 int main()
 {
-    MoveData dataset[DATASET_SIZE];
-    MoveData *ptr = dataset;
+    LinearRegressionModel *model = new_model(0.0, 0.0, 0.01, 10000); // 0.0 weight, 0.0 bias, 0.01 learning rate, 10000 epochs
 
-    if (load_dataset(ptr) != 0)
-    {
-        fprintf(stderr, "Dataset loading failed.\n");
-        return 1;
-    }
+    train(model); // train model based on traits defined above
 
-    printf("Data from file:\n");
-    for (int i = 0; i < DATASET_SIZE; i++)
-    {
-        printf("Game Data %d: %s\n", i, dataset[i].board);
-    }
+    evaluate(model);
 
+    // do confusion matrix here
     return 0;
 }

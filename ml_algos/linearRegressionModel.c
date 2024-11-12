@@ -40,7 +40,7 @@ void initialize_weights(double weights[BOARD_SIZE], double weight)
     }
 }
 
-double predict(double features[BOARD_SIZE], double weights[BOARD_SIZE], double bias)
+double predict_wrap(double features[BOARD_SIZE], double weights[BOARD_SIZE], double bias)
 {
     double max_score = -1e9;
     int best_move = -1;
@@ -66,8 +66,18 @@ double predict(double features[BOARD_SIZE], double weights[BOARD_SIZE], double b
     return best_move;
 }
 
-void train(LinearRegressionModel *model)
+int predict(char board[BOARD_SIZE], LinearRegressionModel model)
 {
+    double features[BOARD_SIZE] = {0};
+    board_to_features(board, features);
+    double prediction = predict_wrap(features, model.weights, *model.bias);
+    int predicted_move = (int)roundf(prediction);
+    return predicted_move;
+}
+
+void train(LinearRegressionModel *model, int verbose)
+{
+    printf("Starting training with following parameters: Weight: %.2f, Bias: %.2f, Learning Rate: %.2f, Epochs: %d...\n", model->weights, model->bias, model->learning_rate, model->epochs);
     int num_samples = DATASET_SIZE * 0.8;
 
     for (int epoch = 0; epoch < model->epochs; epoch++)
@@ -80,32 +90,29 @@ void train(LinearRegressionModel *model)
         {
             double features[BOARD_SIZE] = {0};
             board_to_features(model->dataset[i].board, features);
-
-            double prediction = predict(features, model->weights, *model->bias);
-            int predicted_move = (int)roundf(prediction);
+            int predicted_move = predict(model->dataset[i].board, *model);
             int error = predicted_move - model->dataset[i].outcome;
             total_loss += error * error;
 
             // weight update
             for (int j = 0; j < BOARD_SIZE; j++)
             {
-                double adjustment = model->learning_rate * error * features[j]; // regularization
+                double adjustment = model->learning_rate * error * features[j];
                 model->weights[j] -= adjustment;
-
-                // printf("Game %d:Readjusted weight for weight %d: %.2f\n", i, j, model->weights[j]);
             }
             *model->bias -= model->learning_rate * error;
         }
 
         total_loss /= num_samples;
-        for (int j = 0; j < BOARD_SIZE; j++)
+        if (verbose)
         {
+            for (int j = 0; j < BOARD_SIZE; j++)
+            {
 
-            printf("%.2f ", model->weights[j]);
-
-            // printf("Game %d:Readjusted weight for weight %d: %.2f\n", i, j, model->weights[j]);
+                printf("%.2f ", model->weights[j]);
+            }
+            printf(" Epoch %d, Training loss for current epoch: %f\n", epoch, total_loss);
         }
-        printf(" Epoch %d, Training loss for current epoch: %f\n", epoch, total_loss);
     }
 }
 
@@ -119,7 +126,7 @@ void evaluate(LinearRegressionModel *model)
     {
         double features[BOARD_SIZE] = {0};
         board_to_features(model->dataset[i].board, features);
-        double prediction = predict(features, model->weights, *model->bias);
+        double prediction = predict_wrap(features, model->weights, *model->bias);
         int predicted_move = (int)prediction;
 
         if (predicted_move == model->dataset[i].outcome)

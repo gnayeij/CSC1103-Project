@@ -16,11 +16,9 @@ typedef struct linearregressionmodel
     MoveData *dataset;
 } LinearRegressionModel;
 
-double game_to_value(char cell);
+int predict(char board[BOARD_SIZE], LinearRegressionModel model);
 
-double predict(double features[BOARD_SIZE], double weights[BOARD_SIZE], double bias);
-
-void train(LinearRegressionModel *model);
+void train(LinearRegressionModel *model, int verbose);
 
 void evaluate(LinearRegressionModel *model);
 

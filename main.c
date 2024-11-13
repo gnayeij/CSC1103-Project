@@ -3,12 +3,13 @@
 #include <stdbool.h>
 
 #define SCREEN_WIDTH 900
-#define SCREEN_HEIGHT 900
+#define SCREEN_HEIGHT 1000
 #define BOARD_SIZE 3
 #define CELL_SIZE (SCREEN_WIDTH / BOARD_SIZE)
 #define BUTTON_WIDTH 600
 #define BUTTON_HEIGHT 80
 #define BUTTON_FONT_SIZE 40
+#define SCOREBOARD_Y (CELL_SIZE * BOARD_SIZE + 20)
 
 // game states
 typedef enum {
@@ -16,6 +17,13 @@ typedef enum {
     GAME_TWO_PLAYER,
     //GAME_VS_AI
 } GameState;
+
+// score structure
+typedef struct {
+    int playerX;
+    int playerO;
+    int draws;
+} Score;
 
 // game mode button structure
 typedef struct {
@@ -33,6 +41,8 @@ bool isBoardFull(char board[BOARD_SIZE][BOARD_SIZE]);
 void resetGame(char board[BOARD_SIZE][BOARD_SIZE], char *currentPlayer, bool *gameWon);
 void drawLobby(Button *twoPlayerButton, Button *onePlayerButton);
 bool handleButton(Button *button);
+void drawScoreboard(Score score);
+void updateScore(Score *score, bool gameWon, char currentPlayer);
 
 int main(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Tic Tac Toe");
@@ -41,6 +51,13 @@ int main(void) {
     // initialize game state
     GameState currentState = LOBBY;
     
+    // initialize scores
+    Score score = {
+        .playerX = 0,
+        .playerO = 0,
+        .draws = 0
+    };
+
     // initialize button
     Button twoPlayerButton = {
         .bounds = (Rectangle){
@@ -84,6 +101,11 @@ int main(void) {
                     currentState = GAME_TWO_PLAYER;
                     resetGame(board, &currentPlayer, &gameWon);
                     gameOver = false;
+
+                    // reset score every new game session
+                    score.playerX = 0;
+                    score.playerO = 0;
+                    score.draws = 0;
                 }
 
                 if (handleButton(&onePlayerButton)) {
@@ -107,6 +129,7 @@ int main(void) {
                 // game logic
                 if (!gameOver) {
                     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        // Vector2 mousePos = GetMousePosition();
                         int row = mousePos.y / CELL_SIZE;
                         int col = mousePos.x / CELL_SIZE;
 
@@ -117,6 +140,8 @@ int main(void) {
                             }
                             if (gameWon || isBoardFull(board)) {
                                 gameOver = true;
+                                // update score
+                                updateScore(&score, gameWon, currentPlayer);
                             }
                         }
                     }
@@ -136,6 +161,7 @@ int main(void) {
 
             case GAME_TWO_PLAYER:
                 drawBoard(board, mousePos);
+                drawScoreboard(score);
 
                 // draw game status
                 if (gameOver) {
@@ -274,4 +300,31 @@ bool isBoardFull(char board[BOARD_SIZE][BOARD_SIZE]) {
         }
     }
     return true;
+}
+
+void drawScoreboard(Score score){
+    const int fontSize = 30;
+    const int spacing = SCREEN_WIDTH / 3;
+    const int baseY = SCOREBOARD_Y;
+
+    // X's score
+    DrawText(TextFormat("X: %d", score.playerX), spacing/2 - 40, baseY, fontSize, RED);
+    
+    // Draw count
+    DrawText(TextFormat("Draw: %d", score.draws), SCREEN_WIDTH/2 - 50, baseY, fontSize, DARKGRAY);
+    
+    // O's score
+    DrawText(TextFormat("O: %d", score.playerO), spacing * 2 + spacing/2 - 40, baseY, fontSize, BLUE);
+}
+
+void updateScore(Score *score, bool gameWon, char currentPlayer) {
+    if (gameWon) {
+        if (currentPlayer == 'X') {
+            score->playerX++;
+        } else {
+            score->playerO++;
+        }
+    } else {
+        score->draws++;
+    }
 }

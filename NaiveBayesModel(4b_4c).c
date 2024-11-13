@@ -7,7 +7,6 @@
 #define TICTACTOE_DATASET 958
 #define TRAIN_TEST 0.8
 
-
 // Define the structure of dataset
 typedef struct 
 {
@@ -89,7 +88,7 @@ void train_nb()
                 if (train_set[i].board[j] == 'o') model.prob_o[j][1]++;
                 if (train_set[i].board[j] == 'b') model.prob_blank[j][1]++;
             } 
-
+            
             else 
             {
                 if (train_set[i].board[j] == 'x') model.prob_x[j][0]++;
@@ -128,13 +127,11 @@ int predict(char *board)
             win_prob *= model.prob_x[i][1];
             lose_prob *= model.prob_x[i][0];
         } 
-
         else if (board[i] == 'o') 
         {
             win_prob *= model.prob_o[i][1];
             lose_prob *= model.prob_o[i][0];
         } 
-
         else 
         {
             win_prob *= model.prob_blank[i][1];
@@ -157,7 +154,6 @@ void print_board()
         printf("%c ", board[i] == 'b' ? '_' : board[i]);
         if ((i + 1) % 3 == 0) printf("\n");
     }
-
     printf("\n");
 }
 
@@ -196,7 +192,6 @@ void player_move()
         {
             printf("Invalid move. Please try again: ");
         } 
-        
         else 
         {
             board[position - 1] = 'x';
@@ -205,42 +200,54 @@ void player_move()
     }
 }
 
-// Handle moves made by AI
+// Handle moves made by AI using Naive Bayes prediction
 void ai_move() 
 {
     int best_move = -1;
+    double best_win_prob = -1.0;
+
+    // Evaluate each possible move on the board
     for (int i = 0; i < TICTACTOE_BOARD; i++) 
     {
         if (board[i] == 'b') 
         { // Empty space
             board[i] = 'o';    // Tentatively make the move
-            int prediction = predict(board);
-            if (prediction == 1) 
-            { // AI believes this is a winning move
-                best_move = i;
-                board[i] = 'b';    // Undo move
-                break;
+
+            // Predict the outcome if this move is made
+            double win_prob = model.prob_win; // Use Naive Bayes winning probability
+            if (predict(board) == 1) 
+            { 
+                // AI's predicted move leads to a win
+                win_prob *= model.prob_win;
+            } 
+
+            else 
+            {
+                win_prob *= model.prob_lose;
             }
 
-            board[i] = 'b';        // Undo move
-        }
-    }
-    
-    if (best_move == -1) 
-    { // No win can be predicted, first empty spot to be picked
-        for (int i = 0; i < TICTACTOE_BOARD; i++) 
-        {
-           
-            if (board[i] == 'b') 
+            // Track the move with the highest winning probability
+            if (win_prob > best_win_prob) 
             {
+                best_win_prob = win_prob;
                 best_move = i;
-                break;
             }
+
+            board[i] = 'b';    // Undo the move after evaluation
         }
     }
-    
-    board[best_move] = 'o';
-    printf("AI chooses position %d\n", best_move + 1);
+
+    // Make the best move found
+    if (best_move != -1) 
+    {
+        board[best_move] = 'o';
+        printf("AI chooses position %d\n", best_move + 1);
+    } 
+
+    else 
+    {
+        printf("No valid moves can be made.\n");
+    }
 }
 
 // Main game loop
@@ -260,7 +267,7 @@ void play_game()
                 break;
             }
         } 
-        
+
         else 
         {
             ai_move();
@@ -273,56 +280,6 @@ void play_game()
             }
         }
 
-        turn = 1 - turn; // Take alternate turns
-        int empty = 0;
-        for (int i = 0; i < TICTACTOE_BOARD; i++) 
-        {
-            if (board[i] == 'b') 
-            {
-                empty = 1;
-                break;
-            }
-        }
-
-        if (!empty) 
-        {
-            print_board();
-            printf("It's a draw!\n");
-            break;
-        }
+        turn = 1 - turn; //
     }
-}
-
-int main() 
-{
-    // Load and split dataset, train Naive Bayes model
-    if (load_dataset("tic_tac_toe_dataset.txt") != 0) 
-    {
-        return 1;
-    }
-
-    split_dataset();
-    train_nb();
-
-    // Play multiple games to gauge difficulty level
-    char play_again;
-    do 
-    {
-        memset(board, 'b', TICTACTOE_BOARD); // Reset board
-        play_game();
-
-        // Display current AI win count
-        printf("Current win count of AI: %d\n", ai_win_count);
-        printf("Play again? (y/n): ");
-        scanf(" %c", &play_again);
-    } 
-    
-    while (play_again == 'y');
-
-    // Display final difficulty level based on AI wins
-    printf("Total win count of AI: %d\n", ai_win_count);
-    printf("Difficulty level based on number of games AI won: %s\n",
-           ai_win_count > 5 ? "Hard" : ai_win_count > 2 ? "Medium" : "Easy");
-
-    return 0;
 }

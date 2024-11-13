@@ -16,7 +16,9 @@ typedef struct linearregressionmodel
     MoveData *dataset;
 } LinearRegressionModel;
 
-int predict(char board[BOARD_SIZE], LinearRegressionModel model);
+int predict(char board[BOARD_SIZE], LinearRegressionModel model, char type);
+
+void board_to_features_new(char board[BOARD_SIZE], double features[6], char type);
 
 void train(LinearRegressionModel *model, int verbose);
 

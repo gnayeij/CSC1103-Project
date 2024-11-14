@@ -7,15 +7,15 @@
 #define TICTACTOE_DATASET 958
 #define TRAIN_TEST 0.8
 
-// Define the structure of dataset
+// Structure of Tic Tac Toe Game state and result
 typedef struct 
 {
     char board[TICTACTOE_BOARD]; // Player 1 is 'X', Player 2 is 'O', Blank cell is 'b'
-    int outcome;            // Win is '1', Lose is '0'
+    int outcome; // Win is '1', Lose is '0'
 } 
 MoveData;
 
-// Define the probabilities for Naive Bayes
+// Structure of Naive Bayes probabilities
 typedef struct 
 {
     double prob_x[TICTACTOE_BOARD][2]; // 'X' probabilities in each cell
@@ -26,7 +26,7 @@ typedef struct
 } 
 NaiveBayesModel;
 
-// Global data arrays
+// Arrays to store Tic Tac Toe dataset and split it into training and test set
 MoveData dataset[TICTACTOE_DATASET];
 MoveData train_set[(int)(TICTACTOE_DATASET * TRAIN_TEST)];
 MoveData test_set[TICTACTOE_DATASET - (int)(TICTACTOE_DATASET * TRAIN_TEST)];
@@ -35,7 +35,7 @@ NaiveBayesModel model;
 // AI win counter
 int ai_win_count = 0;
 
-// Load the dataset from file
+// Load the dataset from file and populate moves array
 int load_dataset(const char *filename) 
 {
     FILE *file = fopen(filename, "r");
@@ -54,42 +54,48 @@ int load_dataset(const char *filename)
     return 0;
 }
 
-// Split the dataset into train and test sets
+// Split the dataset into train and test sets based on TRAIN_TEST
 void split_dataset() 
 {
     int train_size = (int)(TICTACTOE_DATASET * TRAIN_TEST);
+    
+    // Fill training set up to train_size
     for (int i = 0; i < train_size; i++) 
     {
         train_set[i] = dataset[i];
     }
 
+    // Put remaining data into the test set
     for (int i = train_size; i < TICTACTOE_DATASET; i++) 
     {
         test_set[i - train_size] = dataset[i];
     }
 }
 
-// Train the Naive Bayes Model
+// Train the Naive Bayes Model using training data
 void train_nb() 
 {
     int win_count = 0, lose_count = 0;
     int train_size = (int)(TICTACTOE_DATASET * TRAIN_TEST);
 
+    // Loop through the training set, counting both wins and losses
     for (int i = 0; i < train_size; i++) 
     {
         if (train_set[i].outcome == 1) win_count++;
+        
         else lose_count++;
 
+        //Update each cell counts based on outcome of game
         for (int j = 0; j < TICTACTOE_BOARD; j++) 
         {
-            if (train_set[i].outcome == 1) 
+            if (train_set[i].outcome == 1) //Game outcome is win
             {
                 if (train_set[i].board[j] == 'x') model.prob_x[j][1]++;
                 if (train_set[i].board[j] == 'o') model.prob_o[j][1]++;
                 if (train_set[i].board[j] == 'b') model.prob_blank[j][1]++;
             } 
             
-            else 
+            else //Game outcome is lose
             {
                 if (train_set[i].board[j] == 'x') model.prob_x[j][0]++;
                 if (train_set[i].board[j] == 'o') model.prob_o[j][0]++;
@@ -98,7 +104,7 @@ void train_nb()
         }
     }
 
-    // Convert the counts to probabilities
+    // Calculate the probability from counts
     for (int j = 0; j < TICTACTOE_BOARD; j++) 
     {
         model.prob_x[j][1] /= win_count;
@@ -110,11 +116,12 @@ void train_nb()
         model.prob_blank[j][0] /= lose_count;
     }
 
+    //Set overall win and lose proabilities
     model.prob_win = (double)win_count / train_size;
     model.prob_lose = (double)lose_count / train_size;
 }
 
-// Predict the game outcome using the Naive Bayes Model
+// Predict the game outcome using the Naive Bayes Model based on given Tic Tac Toe board state
 int predict(char *board) 
 {
     double win_prob = model.prob_win;
@@ -145,7 +152,7 @@ int predict(char *board)
 // Tic Tac Toe Board
 char board[TICTACTOE_BOARD] = {'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b'};
 
-// Print the current state of Tic Tac Toe Board
+// Display the current state of Tic Tac Toe Board
 void print_board() 
 {
     printf("Current Board:\n");
@@ -162,9 +169,9 @@ int check_winner(char player)
 {
     int win_positions[8][3] = 
     {
-        {0, 1, 2}, {3, 4, 5}, {6, 7, 8}, // Rows
-        {0, 3, 6}, {1, 4, 7}, {2, 5, 8}, // Columns
-        {0, 4, 8}, {2, 4, 6}             // Diagonals
+        {0, 1, 2}, {3, 4, 5}, {6, 7, 8}, // Rows in Tic Tac Toe Board
+        {0, 3, 6}, {1, 4, 7}, {2, 5, 8}, // Columns in Tic Tac Toe Board
+        {0, 4, 8}, {2, 4, 6} // Diagonals in Tic Tac Toe Board
     };
 
     for (int i = 0; i < 8; i++) 
@@ -180,7 +187,7 @@ int check_winner(char player)
     return 0;
 }
 
-// Handle moves made by player
+// Get and validate moves made by player
 void player_move() 
 {
     int position;
@@ -190,7 +197,7 @@ void player_move()
         scanf("%d", &position);
         if (position < 1 || position > 9 || board[position - 1] != 'b') 
         {
-            printf("Invalid move. Please try again: ");
+            printf("Invalid move made. Please try again: ");
         } 
         else 
         {
@@ -204,21 +211,20 @@ void player_move()
 void ai_move() 
 {
     int best_move = -1;
-    double best_win_prob = -1.0;
+    double highest_prob = -1.0;
 
-    // Evaluate each possible move on the board
+    // Check each possible move on the board to see which has the highest chance to win
     for (int i = 0; i < TICTACTOE_BOARD; i++) 
     {
-        if (board[i] == 'b') 
-        { // Empty space
-            board[i] = 'o';    // Tentatively make the move
+        if (board[i] == 'b') // Empty cell
+        { 
+            board[i] = 'o'; // Make the move tentatively
 
-            // Predict the outcome if this move is made
+            // Predict the outcome if this move is made on empty cell
             double win_prob = model.prob_win; // Use Naive Bayes winning probability
             if (predict(board) == 1) 
             { 
-                // AI's predicted move leads to a win
-                win_prob *= model.prob_win;
+                win_prob *= model.prob_win; // AI's predicted move leads to a win
             } 
 
             else 
@@ -227,13 +233,13 @@ void ai_move()
             }
 
             // Track the move with the highest winning probability
-            if (win_prob > best_win_prob) 
+            if (win_prob > highest_prob) 
             {
-                best_win_prob = win_prob;
+                highest_prob = win_prob;
                 best_move = i;
             }
 
-            board[i] = 'b';    // Undo the move after evaluation
+            board[i] = 'b'; // Undo the move after evaluation
         }
     }
 
@@ -250,7 +256,7 @@ void ai_move()
     }
 }
 
-// Main game loop
+// Main game loop for alternate turns
 void play_game() 
 {
     int turn = 0; // '0' for Player, '1' for AI
@@ -280,6 +286,6 @@ void play_game()
             }
         }
 
-        turn = 1 - turn; //
+        turn = 1 - turn; 
     }
 }

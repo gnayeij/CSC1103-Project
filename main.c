@@ -6,6 +6,7 @@
 #define SCREEN_HEIGHT 1000
 #define BOARD_SIZE 3
 #define CELL_SIZE (SCREEN_WIDTH / BOARD_SIZE)
+#define BUTTON_GAP 40
 #define BUTTON_WIDTH 600
 #define BUTTON_HEIGHT 80
 #define BUTTON_FONT_SIZE 40
@@ -14,8 +15,9 @@
 // game states
 typedef enum {
     LOBBY,
+    DIFFICULTY_SELECT,
     GAME_TWO_PLAYER,
-    //GAME_VS_AI
+    GAME_VS_AI
 } GameState;
 
 // score structure
@@ -25,12 +27,26 @@ typedef struct {
     int draws;
 } Score;
 
+// AI difficulty levels
+typedef enum {
+    EASY = 1,
+    MEDIUM = 2,
+    HARD = 3
+} AIDifficulty;
+
 // game mode button structure
 typedef struct {
     Rectangle bounds;
     const char *text;
     bool isHovered;
 } Button;
+
+// difficulty button structure
+typedef struct {
+    Button easy;
+    Button medium;
+    Button hard;
+} DifficultyButtons;
 
 // function prototypes
 void initializeBoard(char board[BOARD_SIZE][BOARD_SIZE]);
@@ -41,8 +57,72 @@ bool isBoardFull(char board[BOARD_SIZE][BOARD_SIZE]);
 void resetGame(char board[BOARD_SIZE][BOARD_SIZE], char *currentPlayer, bool *gameWon);
 void drawLobby(Button *twoPlayerButton, Button *onePlayerButton);
 bool handleButton(Button *button);
-void drawScoreboard(Score score);
+void drawScoreboard(Score score, GameState gameState);
 void updateScore(Score *score, bool gameWon, char currentPlayer);
+
+void drawDifficultySelect(DifficultyButtons *buttons);
+
+// initialize difficulty selection buttons
+DifficultyButtons initDifficultyButtons() {
+    DifficultyButtons buttons;
+    float startY = SCREEN_HEIGHT/2 - BUTTON_HEIGHT*2;
+    
+    buttons.easy = (Button){
+        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY, BUTTON_WIDTH, BUTTON_HEIGHT},
+        .text = "Easy",
+        .isHovered = false
+    };
+    
+    buttons.medium = (Button){
+        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + BUTTON_HEIGHT + BUTTON_GAP, BUTTON_WIDTH, BUTTON_HEIGHT},
+        .text = "Medium",
+        .isHovered = false
+    };
+    
+    buttons.hard = (Button){
+        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + (BUTTON_HEIGHT + BUTTON_GAP)*2, BUTTON_WIDTH, BUTTON_HEIGHT},
+        .text = "Hard",
+        .isHovered = false
+    };
+    
+    return buttons;
+}
+
+void drawDifficultySelect(DifficultyButtons *buttons) {
+    // draw title
+    const char* title = "Select Difficulty";
+    DrawText(title, SCREEN_WIDTH/2 - MeasureText(title, 50)/2, 100, 50, BLACK);
+    
+    // draw each button
+    Color buttonColor;
+    
+    // easy button
+    buttonColor = buttons->easy.isHovered ? (Color){ 124, 163, 124, 255} : (Color){ 136, 231, 136, 255};
+    DrawRectangleRec(buttons->easy.bounds, buttonColor);
+    DrawText(buttons->easy.text, 
+            buttons->easy.bounds.x + (buttons->easy.bounds.width - MeasureText(buttons->easy.text, BUTTON_FONT_SIZE))/2,
+            buttons->easy.bounds.y + (buttons->easy.bounds.height - BUTTON_FONT_SIZE)/2,
+            BUTTON_FONT_SIZE, WHITE);
+            
+    // medium button
+    buttonColor = buttons->medium.isHovered ? (Color){219, 164, 0, 255} : (Color){255,206,27, 255};
+    DrawRectangleRec(buttons->medium.bounds, buttonColor);
+    DrawText(buttons->medium.text,
+            buttons->medium.bounds.x + (buttons->medium.bounds.width - MeasureText(buttons->medium.text, BUTTON_FONT_SIZE))/2,
+            buttons->medium.bounds.y + (buttons->medium.bounds.height - BUTTON_FONT_SIZE)/2,
+            BUTTON_FONT_SIZE, WHITE);
+            
+    // hard button
+    buttonColor = buttons->hard.isHovered ? (Color){155, 19, 19, 255} : (Color){205,28,24,255};
+    DrawRectangleRec(buttons->hard.bounds, buttonColor);
+    DrawText(buttons->hard.text,
+            buttons->hard.bounds.x + (buttons->hard.bounds.width - MeasureText(buttons->hard.text, BUTTON_FONT_SIZE))/2,
+            buttons->hard.bounds.y + (buttons->hard.bounds.height - BUTTON_FONT_SIZE)/2,
+            BUTTON_FONT_SIZE, WHITE);
+            
+    // Draw return instruction
+    DrawText("Press 'E' to return to menu", 10, SCREEN_HEIGHT - 30, 20, DARKGRAY);
+}
 
 int main(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Tic Tac Toe");
@@ -51,6 +131,12 @@ int main(void) {
     // initialize game state
     GameState currentState = LOBBY;
     
+    // initialize AI difficulty
+    //AIDifficulty aiDifficulty = EASY;
+
+    // initialize difficulty selection buttons
+    DifficultyButtons difficultyButtons = initDifficultyButtons();
+
     // initialize scores
     Score score = {
         .playerX = 0,
@@ -109,7 +195,46 @@ int main(void) {
                 }
 
                 if (handleButton(&onePlayerButton)) {
-                    // need to implement AI function here
+                    currentState = DIFFICULTY_SELECT;
+                }
+                break;
+            case DIFFICULTY_SELECT:
+                // Update button hover states
+                difficultyButtons.easy.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.easy.bounds);
+                difficultyButtons.medium.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.medium.bounds);
+                difficultyButtons.hard.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.hard.bounds);
+                
+                // Handle button clicks
+                if (handleButton(&difficultyButtons.easy)) {
+                    //aiDifficulty = EASY;
+                    currentState = GAME_VS_AI;
+                    resetGame(board, &currentPlayer, &gameWon);
+                    gameOver = false;
+                    score.playerX = 0;
+                    score.playerO = 0;
+                    score.draws = 0;
+                }
+                else if (handleButton(&difficultyButtons.medium)) {
+                    //aiDifficulty = MEDIUM;
+                    currentState = GAME_VS_AI;
+                    resetGame(board, &currentPlayer, &gameWon);
+                    gameOver = false;
+                    score.playerX = 0;
+                    score.playerO = 0;
+                    score.draws = 0;
+                }
+                else if (handleButton(&difficultyButtons.hard)) {
+                    //aiDifficulty = HARD;
+                    currentState = GAME_VS_AI;
+                    resetGame(board, &currentPlayer, &gameWon);
+                    gameOver = false;
+                    score.playerX = 0;
+                    score.playerO = 0;
+                    score.draws = 0;
+                }
+                
+                if (IsKeyPressed(KEY_E)) {
+                    currentState = LOBBY;
                 }
                 break;
 
@@ -147,6 +272,10 @@ int main(void) {
                     }
                 }
                 break;
+            
+            case GAME_VS_AI:
+                // minmax AI goes here
+                break;
         }
 
         // draw canvas
@@ -159,9 +288,13 @@ int main(void) {
                 drawLobby(&twoPlayerButton, &onePlayerButton);
                 break;
 
+            case DIFFICULTY_SELECT:
+                drawDifficultySelect(&difficultyButtons);
+                break;
+
             case GAME_TWO_PLAYER:
                 drawBoard(board, mousePos);
-                drawScoreboard(score);
+                drawScoreboard(score, currentState);
 
                 // draw game status
                 if (gameOver) {
@@ -183,6 +316,9 @@ int main(void) {
                 // draw return to lobby message
                 const char* returnMessage = "Press E to return to Lobby";
                 DrawText(returnMessage, SCREEN_WIDTH/2 - MeasureText(returnMessage, 20)/2, SCREEN_HEIGHT-20, 20, DARKGRAY);
+                break;
+            case GAME_VS_AI:
+                // minmax AI goes here
                 break;
         }
 
@@ -302,19 +438,21 @@ bool isBoardFull(char board[BOARD_SIZE][BOARD_SIZE]) {
     return true;
 }
 
-void drawScoreboard(Score score){
+// score display for different game modes
+void drawScoreboard(Score score, GameState gameState) {
     const int fontSize = 30;
     const int spacing = SCREEN_WIDTH / 3;
     const int baseY = SCOREBOARD_Y;
-
-    // X's score
-    DrawText(TextFormat("X: %d", score.playerX), spacing/2 - 40, baseY, fontSize, RED);
     
-    // Draw count
-    DrawText(TextFormat("Draw: %d", score.draws), SCREEN_WIDTH/2 - 50, baseY, fontSize, DARKGRAY);
-    
-    // O's score
-    DrawText(TextFormat("O: %d", score.playerO), spacing * 2 + spacing/2 - 40, baseY, fontSize, BLUE);
+    if (gameState == GAME_TWO_PLAYER) {
+        DrawText(TextFormat("X: %d", score.playerX), spacing/2 - 40, baseY, fontSize, RED);
+        DrawText(TextFormat("Draw: %d", score.draws), SCREEN_WIDTH/2 - 50, baseY, fontSize, DARKGRAY);
+        DrawText(TextFormat("O: %d", score.playerO), spacing * 2 + spacing/2 - 40, baseY, fontSize, BLUE);
+    } else if (gameState == GAME_VS_AI) {
+        DrawText(TextFormat("Player: %d", score.playerX), spacing/2 - 60, baseY, fontSize, RED);
+        DrawText(TextFormat("Draw: %d", score.draws), SCREEN_WIDTH/2 - 50, baseY, fontSize, DARKGRAY);
+        DrawText(TextFormat("AI: %d", score.playerO), spacing * 2 + spacing/2 - 40, baseY, fontSize, BLUE);
+    }
 }
 
 void updateScore(Score *score, bool gameWon, char currentPlayer) {

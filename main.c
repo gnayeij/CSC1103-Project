@@ -1,4 +1,5 @@
 #include "include/raylib.h"
+#include "include/backgroundmusic.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -12,7 +13,6 @@
 #define BUTTON_HEIGHT 80
 #define BUTTON_FONT_SIZE 40
 #define SCOREBOARD_Y (CELL_SIZE * BOARD_SIZE + 20)
-
 
 // game states
 typedef enum {
@@ -57,7 +57,7 @@ bool makeMove(char board[BOARD_SIZE][BOARD_SIZE], int row, int col, char player)
 bool checkWin(char board[BOARD_SIZE][BOARD_SIZE], char player);
 bool isBoardFull(char board[BOARD_SIZE][BOARD_SIZE]);
 void resetGame(char board[BOARD_SIZE][BOARD_SIZE], char *currentPlayer, bool *gameWon);
-void drawLobby(Button *twoPlayerButton, Button *onePlayerButton);
+void drawLobby(Button *twoPlayerButton, Button *onePlayerButton, Font fontBm);
 bool handleButton(Button *button);
 void drawScoreboard(Score score, GameState gameState);
 void updateScore(Score *score, bool gameWon, char currentPlayer);
@@ -132,7 +132,27 @@ void drawDifficultySelect(DifficultyButtons *buttons) {
 
 int main(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Tic Tac Toe");
+
+    Font fontBm = LoadFontEx("resources/fonts/pixantiqua.ttf", 100, 0, 250);
+    SetTextLineSpacing(16);         // Set line spacing for multiline text (when line breaks are included '\n')
+
     SetTargetFPS(60);
+
+    const char* fxBGM = "resources/background-music.mp3";
+    if (init_BGM_audio(fxBGM) != 0) {
+        printf("Failed to initialize audio\n");
+        return -1;
+    }
+
+    SoundEffect click_sound = {0};  // Initialize to zero
+    if (load_sound_effect("resources/button-click.wav", &click_sound) != 0) {
+        cleanup_audio();
+        CloseWindow();
+        return -1;
+    }
+
+    start_background_music();
+    set_music_volume(0.2f);
 
     // initialize game state
     GameState currentState = LOBBY;
@@ -157,7 +177,7 @@ int main(void) {
             SCREEN_HEIGHT/2 - BUTTON_HEIGHT - 40/2, 
             BUTTON_WIDTH, 
             BUTTON_HEIGHT},
-        .text = "2 Player Mode",
+        .text = "2 Players Mode",
         .isHovered = false
     };
 
@@ -184,11 +204,13 @@ int main(void) {
         Vector2 mousePos = GetMousePosition();
         // update
         switch (currentState) {
-            case LOBBY:
+            case LOBBY:    
                 twoPlayerButton.isHovered = CheckCollisionPointRec(GetMousePosition(), twoPlayerButton.bounds);
                 onePlayerButton.isHovered = CheckCollisionPointRec(GetMousePosition(), onePlayerButton.bounds);
 
                 if (handleButton(&twoPlayerButton)) {
+                    play_sound_effect(&click_sound);
+                    stop_background_music();
                     currentState = GAME_TWO_PLAYER;
                     resetGame(board, &currentPlayer, &gameWon);
                     gameOver = false;
@@ -200,6 +222,7 @@ int main(void) {
                 }
 
                 if (handleButton(&onePlayerButton)) {
+                    play_sound_effect(&click_sound);
                     currentState = DIFFICULTY_SELECT;
                 }
                 break;
@@ -211,6 +234,8 @@ int main(void) {
                 
                 // Handle button clicks
                 if (handleButton(&difficultyButtons.easy)) {
+                    play_sound_effect(&click_sound);
+                    stop_background_music();
                     aiDifficulty = EASY;
                     currentState = GAME_VS_AI;
                     resetGame(board, &currentPlayer, &gameWon);
@@ -220,6 +245,8 @@ int main(void) {
                     score.draws = 0;
                 }
                 else if (handleButton(&difficultyButtons.medium)) {
+                    play_sound_effect(&click_sound);
+                    stop_background_music();
                     aiDifficulty = MEDIUM;
                     currentState = GAME_VS_AI;
                     resetGame(board, &currentPlayer, &gameWon);
@@ -229,6 +256,8 @@ int main(void) {
                     score.draws = 0;
                 }
                 else if (handleButton(&difficultyButtons.hard)) {
+                    play_sound_effect(&click_sound);
+                    stop_background_music();
                     aiDifficulty = HARD;
                     currentState = GAME_VS_AI;
                     resetGame(board, &currentPlayer, &gameWon);
@@ -252,6 +281,7 @@ int main(void) {
                 
                 // back to lobby
                 if (IsKeyPressed(KEY_E)) {
+                    start_background_music();
                     currentState = LOBBY;
                     continue;
                 }
@@ -259,6 +289,7 @@ int main(void) {
                 // game logic
                 if (!gameOver) {
                     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                        play_sound_effect(&click_sound);
                         // Vector2 mousePos = GetMousePosition();
                         int row = mousePos.y / CELL_SIZE;
                         int col = mousePos.x / CELL_SIZE;
@@ -287,6 +318,7 @@ int main(void) {
                 
                 // back to lobby
                 if (IsKeyPressed(KEY_E)) {
+                    start_background_music();
                     currentState = LOBBY;
                     continue;
                 }
@@ -294,6 +326,7 @@ int main(void) {
                 if (!gameOver) {
                     if (currentPlayer == 'X') {  // player's turn
                         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                            play_sound_effect(&click_sound);
                             int row = mousePos.y / CELL_SIZE;
                             int col = mousePos.x / CELL_SIZE;
 
@@ -328,6 +361,7 @@ int main(void) {
                     }
                 }
                 break;
+    
         }
 
         // draw canvas
@@ -341,7 +375,7 @@ int main(void) {
 
         switch (currentState) {
             case LOBBY:
-                drawLobby(&twoPlayerButton, &onePlayerButton);
+                drawLobby(&twoPlayerButton, &onePlayerButton, fontBm);
                 break;
 
             case DIFFICULTY_SELECT:
@@ -402,15 +436,17 @@ int main(void) {
 
         EndDrawing();
     }
-
+    unload_sound_effect(&click_sound);
+    cleanup_audio();
     CloseWindow();
     return 0;
 }
 
-void drawLobby(Button *twoPlayerButton, Button *onePlayerButton) {
+void drawLobby(Button *twoPlayerButton, Button *onePlayerButton, Font fontBm) {
     // draw title
     const char* title = "Tic Tac Toe";
-    DrawText(title, SCREEN_WIDTH/2 - MeasureText(title, 50)/2, 100, 50, BLACK);
+    //DrawText(title, SCREEN_WIDTH/2 - MeasureText(title, 50)/2, 100, 50, BLACK);
+    DrawTextEx(fontBm, title, (Vector2){((SCREEN_WIDTH/2) - (MeasureText(title, 100)/2) + 50), 100}, 100, 2, MAROON);
 
     // draw 2 players button
     Color twoplayer_buttonColor = twoPlayerButton->isHovered ? DARKGRAY : GRAY;

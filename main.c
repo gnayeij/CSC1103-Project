@@ -1,6 +1,7 @@
 #include "include/raylib.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #define SCREEN_WIDTH 900
 #define SCREEN_HEIGHT 1000
@@ -11,6 +12,7 @@
 #define BUTTON_HEIGHT 80
 #define BUTTON_FONT_SIZE 40
 #define SCOREBOARD_Y (CELL_SIZE * BOARD_SIZE + 20)
+
 
 // game states
 typedef enum {
@@ -61,6 +63,10 @@ void drawScoreboard(Score score, GameState gameState);
 void updateScore(Score *score, bool gameWon, char currentPlayer);
 
 void drawDifficultySelect(DifficultyButtons *buttons);
+
+void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty);
+void makeRandomMove(char board[BOARD_SIZE][BOARD_SIZE], char player);
+int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai);
 
 // initialize difficulty selection buttons
 DifficultyButtons initDifficultyButtons() {
@@ -132,7 +138,7 @@ int main(void) {
     GameState currentState = LOBBY;
     
     // initialize AI difficulty
-    //AIDifficulty aiDifficulty = EASY;
+    AIDifficulty aiDifficulty = EASY;
 
     // initialize difficulty selection buttons
     DifficultyButtons difficultyButtons = initDifficultyButtons();
@@ -176,7 +182,6 @@ int main(void) {
 
     while (!WindowShouldClose()) {
         Vector2 mousePos = GetMousePosition();
-
         // update
         switch (currentState) {
             case LOBBY:
@@ -206,7 +211,7 @@ int main(void) {
                 
                 // Handle button clicks
                 if (handleButton(&difficultyButtons.easy)) {
-                    //aiDifficulty = EASY;
+                    aiDifficulty = EASY;
                     currentState = GAME_VS_AI;
                     resetGame(board, &currentPlayer, &gameWon);
                     gameOver = false;
@@ -215,7 +220,7 @@ int main(void) {
                     score.draws = 0;
                 }
                 else if (handleButton(&difficultyButtons.medium)) {
-                    //aiDifficulty = MEDIUM;
+                    aiDifficulty = MEDIUM;
                     currentState = GAME_VS_AI;
                     resetGame(board, &currentPlayer, &gameWon);
                     gameOver = false;
@@ -224,7 +229,7 @@ int main(void) {
                     score.draws = 0;
                 }
                 else if (handleButton(&difficultyButtons.hard)) {
-                    //aiDifficulty = HARD;
+                    aiDifficulty = HARD;
                     currentState = GAME_VS_AI;
                     resetGame(board, &currentPlayer, &gameWon);
                     gameOver = false;
@@ -274,7 +279,54 @@ int main(void) {
                 break;
             
             case GAME_VS_AI:
-                // minmax AI goes here
+                // check for restart
+                if (gameOver && IsKeyPressed(KEY_SPACE)) {
+                    resetGame(board, &currentPlayer, &gameWon);
+                    gameOver = false;
+                }
+                
+                // back to lobby
+                if (IsKeyPressed(KEY_E)) {
+                    currentState = LOBBY;
+                    continue;
+                }
+
+                if (!gameOver) {
+                    if (currentPlayer == 'X') {  // player's turn
+                        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                            int row = mousePos.y / CELL_SIZE;
+                            int col = mousePos.x / CELL_SIZE;
+
+                            if (makeMove(board, row, col, currentPlayer)) {
+                                gameWon = checkWin(board, currentPlayer);
+                                if (!gameWon) {
+                                    currentPlayer = 'O';  // switch to AI's turn
+                                }
+                                if (gameWon || isBoardFull(board)) {
+                                    gameOver = true;
+                                    updateScore(&score, gameWon, currentPlayer);
+                                }
+                            }
+                        }
+                    } else {  // AI's turn
+                        static float aiDelay = 0.5f;  // half second delay
+                        static float aiTimer = 0.0f;
+                        
+                        aiTimer += GetFrameTime();
+                        if (aiTimer >= aiDelay) {
+                            aiMove(board, 'O', aiDifficulty);
+                            gameWon = checkWin(board, currentPlayer);
+                            if (gameWon || isBoardFull(board)) {
+                                gameOver = true;
+                                updateScore(&score, gameWon, currentPlayer);
+                            }
+                            if (!gameWon) {
+                                currentPlayer = 'X';  // switch back to player's turn
+                            }
+                            aiTimer = 0.0f;  // reset timer
+                        }
+                    }
+                }
                 break;
         }
 
@@ -282,6 +334,10 @@ int main(void) {
         BeginDrawing();
         Color softBeige = {237, 232, 208, 255};
         ClearBackground(softBeige);
+
+        // define common messages outside switch to prevent redefinition error
+        const char* returnMessage = "Press E to return to Lobby";
+        const char* restartMsg = "Press SPACEBAR to restart";
 
         switch (currentState) {
             case LOBBY:
@@ -305,7 +361,6 @@ int main(void) {
                         const char* message = "It's a draw!";
                         DrawText(message, SCREEN_WIDTH/2 - MeasureText(message, 40)/2, SCREEN_HEIGHT/2 - 20, 40, BLACK);
                     }
-                    const char* restartMsg = "Press SPACEBAR to restart";
                     DrawText(restartMsg, SCREEN_WIDTH/2 - MeasureText(restartMsg, 20)/2, SCREEN_HEIGHT/2 + 30, 20, DARKGRAY);
                 } else {
                     const char* message = TextFormat("Player %c's turn", currentPlayer);
@@ -314,11 +369,34 @@ int main(void) {
                 }
                 
                 // draw return to lobby message
-                const char* returnMessage = "Press E to return to Lobby";
                 DrawText(returnMessage, SCREEN_WIDTH/2 - MeasureText(returnMessage, 20)/2, SCREEN_HEIGHT-20, 20, DARKGRAY);
                 break;
             case GAME_VS_AI:
-                // minmax AI goes here
+                drawBoard(board, mousePos);
+                drawScoreboard(score, currentState);
+
+                // draw game status
+                if (gameOver) {
+                    if (gameWon) {
+                        const char* message = (currentPlayer == 'X') ? "You win!" : "AI wins!";
+                        DrawText(message, SCREEN_WIDTH/2 - MeasureText(message, 40)/2, SCREEN_HEIGHT/2 - 20, 40, GREEN);
+                    } else {
+                        const char* message = "It's a draw!";
+                        DrawText(message, SCREEN_WIDTH/2 - MeasureText(message, 40)/2, SCREEN_HEIGHT/2 - 20, 40, BLACK);
+                    }
+                    DrawText(restartMsg, SCREEN_WIDTH/2 - MeasureText(restartMsg, 20)/2, SCREEN_HEIGHT/2 + 30, 20, DARKGRAY);
+                } else {
+                    const char* message;
+                    if (currentPlayer == 'X') {
+                        message = "Your turn";
+                    } else {
+                        message = "AI is thinking...";
+                    }
+                    DrawText(message, SCREEN_WIDTH/2 - MeasureText(message, 50)/2, 20, 50, DARKGRAY);
+                }
+                
+                // draw return to lobby message
+                DrawText(returnMessage, SCREEN_WIDTH/2 - MeasureText(returnMessage, 20)/2, SCREEN_HEIGHT-20, 20, DARKGRAY);
                 break;
         }
 
@@ -464,5 +542,99 @@ void updateScore(Score *score, bool gameWon, char currentPlayer) {
         }
     } else {
         score->draws++;
+    }
+}
+
+void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty) {
+    // Easy difficulty: random move
+    if (difficulty == EASY) {
+        makeRandomMove(board, ai);
+        return;
+    }
+
+    // Medium difficulty: 70% optimal move, 30% random
+    if (difficulty == MEDIUM && (rand() % 10) < 3) {
+        makeRandomMove(board, ai);
+        return;
+    }
+
+    // Medium/Hard: Use minimax to find best move
+    int bestScore = 1000;
+    int bestMove[2] = {-1, -1};
+
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
+            if (board[i][j] == ' ') {
+                board[i][j] = ai;
+                int score = minimax(board, 0, true, 'X', ai);
+                board[i][j] = ' ';
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestMove[0] = i;
+                    bestMove[1] = j;
+                }
+            }
+        }
+    }
+
+    if (bestMove[0] != -1 && bestMove[1] != -1) {
+        makeMove(board, bestMove[0], bestMove[1], ai);
+    }
+}
+
+void makeRandomMove(char board[BOARD_SIZE][BOARD_SIZE], char player) {
+    int available[BOARD_SIZE * BOARD_SIZE][2];
+    int count = 0;
+
+    // Find all empty positions
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
+            if (board[i][j] == ' ') {
+                available[count][0] = i;
+                available[count][1] = j;
+                count++;
+            }
+        }
+    }
+
+    if (count > 0) {
+        int randIndex = rand() % count;
+        makeMove(board, available[randIndex][0], available[randIndex][1], player);
+    }
+}
+
+int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai) {
+    // Check terminal states
+    if (checkWin(board, ai)) return depth - 10;
+    if (checkWin(board, player)) return 10 - depth;
+    if (isBoardFull(board)) return 0;
+
+    if (isMaximizing) {
+        int bestScore = -1000;
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            for (int j = 0; j < BOARD_SIZE; j++) {
+                if (board[i][j] == ' ') {
+                    board[i][j] = player;
+                    int score = minimax(board, depth + 1, false, player, ai);
+                    board[i][j] = ' ';
+                    bestScore = (score > bestScore) ? score : bestScore;
+                }
+            }
+        }
+        return bestScore;
+    } else {
+        int bestScore = 1000;
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            for (int j = 0; j < BOARD_SIZE; j++) {
+                if (board[i][j] == ' ') {
+                    board[i][j] = ai;
+                    int score = minimax(board, depth + 1, true, player, ai);
+                    board[i][j] = ' ';
+                    bestScore = (score < bestScore) ? score : bestScore;
+                }
+            }
+        }
+        return bestScore;
     }
 }

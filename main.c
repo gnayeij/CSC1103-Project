@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <math.h>
+#include <string.h>
 
 #define SCREEN_WIDTH 900
 #define SCREEN_HEIGHT 1000
@@ -18,9 +20,23 @@
 typedef enum {
     LOBBY,
     DIFFICULTY_SELECT,
+    COIN_FLIP,
+    COIN_FLIP_TWO_PLAYER,
     GAME_TWO_PLAYER,
     GAME_VS_AI
 } GameState;
+
+typedef struct {
+    float rotationAngle;
+    float speed;
+    float scale;
+    bool isFlipping;
+    float flipTime;
+    bool result; // true for player first, false for AI first
+    float totalFlipTime;
+    bool isDelaying;    
+    float delayTimer;  
+} CoinFlip;
 
 // score structure
 typedef struct {
@@ -94,6 +110,46 @@ DifficultyButtons initDifficultyButtons() {
     return buttons;
 }
 
+void DrawCoin(CoinFlip *coin, const char *mode_Coinflip) {
+    int centerX = SCREEN_WIDTH / 2;
+    int centerY = SCREEN_HEIGHT / 2;
+    float scaledSize = 100 * coin->scale;  // base size of 100 pixels
+    
+    // draw the coin
+    Color coinColor = GOLD;
+    bool showAISide;
+
+    if (coin->isFlipping) {
+        // switch sides based on rotation
+        showAISide = (coin->rotationAngle > 90 && coin->rotationAngle < 270);
+    } else {
+        // animation ends, show the correct side based on result
+        showAISide = !coin->result;  // show AI if AI goes first (!result)
+    }
+
+    if (showAISide) {
+        coinColor = ORANGE;  // different color for AI side
+    }
+    
+    // draw the coin as an ellipse that changes shape based on rotation
+    float stretchFactor = fabsf(cosf(coin->rotationAngle * DEG2RAD));
+    DrawEllipse(centerX, centerY, scaledSize, scaledSize * stretchFactor, coinColor);
+    
+    // compare which mode is being called, then draw the text on the coin
+    const char* text;
+    if (strcmp(mode_Coinflip, "1-player") == 0) {
+        text = showAISide ? "AI" : "YOU";
+    } else {
+        text = showAISide ? "O" : "X"; 
+    }
+    int fontSize = 40 * stretchFactor;
+    DrawText(text, 
+            centerX - MeasureText(text, fontSize)/2,
+            centerY - fontSize/2,
+            fontSize,
+            BLACK);
+}
+
 void drawDifficultySelect(DifficultyButtons *buttons) {
     // draw title
     const char* title = "Select Difficulty";
@@ -126,7 +182,7 @@ void drawDifficultySelect(DifficultyButtons *buttons) {
             buttons->hard.bounds.y + (buttons->hard.bounds.height - BUTTON_FONT_SIZE)/2,
             BUTTON_FONT_SIZE, WHITE);
             
-    // Draw return instruction
+    // draw return instruction
     DrawText("Press 'E' to return to menu", 10, SCREEN_HEIGHT - 30, 20, DARKGRAY);
 }
 
@@ -134,7 +190,7 @@ int main(void) {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Tic Tac Toe");
 
     Font fontBm = LoadFontEx("resources/fonts/pixantiqua.ttf", 100, 0, 250);
-    SetTextLineSpacing(16);         // Set line spacing for multiline text (when line breaks are included '\n')
+    SetTextLineSpacing(16);         // set line spacing for multiline text (when line breaks are included '\n')
 
     SetTargetFPS(60);
 
@@ -144,8 +200,24 @@ int main(void) {
         return -1;
     }
 
-    SoundEffect click_sound = {0};  // Initialize to zero
+    SoundEffect click_sound = {0};  // initialize to zero
     if (load_sound_effect("resources/button-click.wav", &click_sound) != 0) {
+        cleanup_audio();
+        CloseWindow();
+        return -1;
+    }
+
+    SoundEffect coin_sound = {0}; // initialize to zero
+    if (load_sound_effect("resources/coin-flip.wav", &coin_sound) != 0) {
+        unload_sound_effect(&click_sound); // unload previous sound effect
+        cleanup_audio();
+        CloseWindow();
+        return -1;
+    }
+
+    SoundEffect roundend_sound = {0}; // initialize to zero
+    if (load_sound_effect("resources/round-end.wav", &roundend_sound) != 0) {
+        //unload_sound_effect(&coin_sound);// unload previous sound effect
         cleanup_audio();
         CloseWindow();
         return -1;
@@ -153,6 +225,17 @@ int main(void) {
 
     start_background_music();
     set_music_volume(0.2f);
+
+    // initialize coin flip
+    CoinFlip coinFlip = {
+        .rotationAngle = 0,
+        .speed = 720.0f,  // rotation degrees per second
+        .scale = 1.0f,
+        .isFlipping = false,
+        .flipTime = 0,
+        .result = false,
+        .totalFlipTime = 2.0f  // total time for the flip animation
+    };
 
     // initialize game state
     GameState currentState = LOBBY;
@@ -211,9 +294,14 @@ int main(void) {
                 if (handleButton(&twoPlayerButton)) {
                     play_sound_effect(&click_sound);
                     stop_background_music();
-                    currentState = GAME_TWO_PLAYER;
-                    resetGame(board, &currentPlayer, &gameWon);
-                    gameOver = false;
+                    play_sound_effect(&coin_sound);
+                    currentState = COIN_FLIP_TWO_PLAYER;
+                    coinFlip.isFlipping = true;
+                    coinFlip.flipTime = 0;
+                    coinFlip.rotationAngle = 0;
+                    coinFlip.result = (rand() % 2) == 0;  // Random result
+                    coinFlip.isDelaying = false;
+                    coinFlip.delayTimer = 0.0f;
 
                     // reset score every new game session
                     score.playerX = 0;
@@ -237,34 +325,34 @@ int main(void) {
                     play_sound_effect(&click_sound);
                     stop_background_music();
                     aiDifficulty = EASY;
-                    currentState = GAME_VS_AI;
-                    resetGame(board, &currentPlayer, &gameWon);
-                    gameOver = false;
-                    score.playerX = 0;
-                    score.playerO = 0;
-                    score.draws = 0;
+                    play_sound_effect(&coin_sound);
+                    currentState = COIN_FLIP;
+                    coinFlip.isFlipping = true;
+                    coinFlip.flipTime = 0;
+                    coinFlip.rotationAngle = 0;
+                    coinFlip.result = (rand() % 2) == 0;  // Random result
                 }
                 else if (handleButton(&difficultyButtons.medium)) {
                     play_sound_effect(&click_sound);
                     stop_background_music();
                     aiDifficulty = MEDIUM;
-                    currentState = GAME_VS_AI;
-                    resetGame(board, &currentPlayer, &gameWon);
-                    gameOver = false;
-                    score.playerX = 0;
-                    score.playerO = 0;
-                    score.draws = 0;
+                    play_sound_effect(&coin_sound);
+                    currentState = COIN_FLIP;
+                    coinFlip.isFlipping = true;
+                    coinFlip.flipTime = 0;
+                    coinFlip.rotationAngle = 0;
+                    coinFlip.result = (rand() % 2) == 0;  // Random result
                 }
                 else if (handleButton(&difficultyButtons.hard)) {
                     play_sound_effect(&click_sound);
                     stop_background_music();
                     aiDifficulty = HARD;
-                    currentState = GAME_VS_AI;
-                    resetGame(board, &currentPlayer, &gameWon);
-                    gameOver = false;
-                    score.playerX = 0;
-                    score.playerO = 0;
-                    score.draws = 0;
+                    play_sound_effect(&coin_sound);
+                    currentState = COIN_FLIP;
+                    coinFlip.isFlipping = true;
+                    coinFlip.flipTime = 0;
+                    coinFlip.rotationAngle = 0;
+                    coinFlip.result = (rand() % 2) == 0;  // Random result
                 }
                 
                 if (IsKeyPressed(KEY_E)) {
@@ -275,12 +363,22 @@ int main(void) {
             case GAME_TWO_PLAYER:
                 // check for restart
                 if (gameOver && IsKeyPressed(KEY_SPACE)) {
-                    resetGame(board, &currentPlayer, &gameWon);
-                    gameOver = false;
+                    play_sound_effect(&coin_sound);
+                    currentState = COIN_FLIP_TWO_PLAYER;
+                    // Initialize coin flip
+                    coinFlip.isFlipping = true;
+                    coinFlip.flipTime = 0;
+                    coinFlip.rotationAngle = 0;
+                    coinFlip.result = (rand() % 2) == 0;  // Random result
+                    coinFlip.isDelaying = false;
+                    coinFlip.delayTimer = 0.0f;;
                 }
                 
                 // back to lobby
                 if (IsKeyPressed(KEY_E)) {
+                    score.playerX = 0;
+                    score.playerO = 0;
+                    score.draws = 0;
                     start_background_music();
                     currentState = LOBBY;
                     continue;
@@ -300,6 +398,7 @@ int main(void) {
                                 currentPlayer = (currentPlayer == 'X') ? 'O' : 'X';
                             }
                             if (gameWon || isBoardFull(board)) {
+                                play_sound_effect(&roundend_sound);
                                 gameOver = true;
                                 // update score
                                 updateScore(&score, gameWon, currentPlayer);
@@ -308,16 +407,26 @@ int main(void) {
                     }
                 }
                 break;
-            
+
             case GAME_VS_AI:
                 // check for restart
                 if (gameOver && IsKeyPressed(KEY_SPACE)) {
-                    resetGame(board, &currentPlayer, &gameWon);
-                    gameOver = false;
+                    play_sound_effect(&coin_sound);
+                    currentState = COIN_FLIP;
+                    // Initialize coin flip
+                    coinFlip.isFlipping = true;
+                    coinFlip.flipTime = 0;
+                    coinFlip.rotationAngle = 0;
+                    coinFlip.result = (rand() % 2) == 0;  // Random result
+                    coinFlip.isDelaying = false;
+                    coinFlip.delayTimer = 0.0f;
                 }
                 
                 // back to lobby
                 if (IsKeyPressed(KEY_E)) {
+                    score.playerX = 0;
+                    score.playerO = 0;
+                    score.draws = 0;
                     start_background_music();
                     currentState = LOBBY;
                     continue;
@@ -336,6 +445,7 @@ int main(void) {
                                     currentPlayer = 'O';  // switch to AI's turn
                                 }
                                 if (gameWon || isBoardFull(board)) {
+                                    play_sound_effect(&roundend_sound);
                                     gameOver = true;
                                     updateScore(&score, gameWon, currentPlayer);
                                 }
@@ -350,6 +460,7 @@ int main(void) {
                             aiMove(board, 'O', aiDifficulty);
                             gameWon = checkWin(board, currentPlayer);
                             if (gameWon || isBoardFull(board)) {
+                                play_sound_effect(&roundend_sound);
                                 gameOver = true;
                                 updateScore(&score, gameWon, currentPlayer);
                             }
@@ -361,6 +472,73 @@ int main(void) {
                     }
                 }
                 break;
+
+            case COIN_FLIP_TWO_PLAYER:
+                if (coinFlip.isFlipping) {
+                    coinFlip.flipTime += GetFrameTime();
+                    
+                    float progress = coinFlip.flipTime / coinFlip.totalFlipTime;
+                    if (progress < 1.0f) {
+                        float currentSpeed = coinFlip.speed * (1.0f - progress);
+                        coinFlip.rotationAngle += currentSpeed * GetFrameTime();
+                        while (coinFlip.rotationAngle >= 360) coinFlip.rotationAngle -= 360;
+                    } else {
+                        coinFlip.isFlipping = false;
+                        coinFlip.isDelaying = true;
+                        coinFlip.delayTimer = 0.0f;
+                    }
+                } else if (coinFlip.isDelaying) {
+                    coinFlip.delayTimer += GetFrameTime();
+                    if (coinFlip.delayTimer >= 1.5f) {
+                        resetGame(board, &currentPlayer, &gameWon);
+                        gameOver = false;
+                        currentPlayer = coinFlip.result ? 'X' : 'O';
+                        currentState = GAME_TWO_PLAYER;
+                    }
+                }
+                break;
+
+            case COIN_FLIP:
+                if (coinFlip.isFlipping) {
+                    coinFlip.flipTime += GetFrameTime();
+                    
+                    // update rotation
+                    float progress = coinFlip.flipTime / coinFlip.totalFlipTime;
+                    if (progress < 1.0f) {
+                        // gradually slow down the rotation
+                        float currentSpeed = coinFlip.speed * (1.0f - progress);
+                        coinFlip.rotationAngle += currentSpeed * GetFrameTime();
+                        
+                        // keep angle between 0 and 360
+                        while (coinFlip.rotationAngle >= 360) coinFlip.rotationAngle -= 360;
+                    } else {
+                        // flip animation complete, start delay
+                        coinFlip.isFlipping = false;
+                        coinFlip.isDelaying = true;
+                        coinFlip.delayTimer = 0.0f;
+                    }
+                } else if (coinFlip.isDelaying) {
+                    // update delay timer
+                    coinFlip.delayTimer += GetFrameTime();
+                    // after 1.5 second delay, start game
+                    if (coinFlip.delayTimer >= 1.5f) {
+                        resetGame(board, &currentPlayer, &gameWon);
+                        gameOver = false;
+                        // set starting player based on coin flip result
+                        currentPlayer = coinFlip.result ? 'X' : 'O';  // When result is true, player starts (X). When false, AI starts (X)
+                        if (currentPlayer == 'O') {  // if AI won the flip
+                            currentState = GAME_VS_AI;
+                            // make AI's first move immediately
+                            aiMove(board, 'O', EASY); // we parse EASY to call makeRandomMove(), so AI's first move is always random
+                            currentPlayer = 'X';  // then set to player's turn (X)
+                        } else if (currentPlayer == 'X') {
+                            currentState = GAME_VS_AI;
+                        }
+                    }
+                }
+                break;
+
+            
     
         }
 
@@ -405,6 +583,51 @@ int main(void) {
                 // draw return to lobby message
                 DrawText(returnMessage, SCREEN_WIDTH/2 - MeasureText(returnMessage, 20)/2, SCREEN_HEIGHT-20, 20, DARKGRAY);
                 break;
+
+            case COIN_FLIP:
+                DrawCoin(&coinFlip, "1-player");
+                // show "flipping" text only during flip animation
+                if (coinFlip.isFlipping) {
+                    const char* flipText = "Flipping coin to decide who goes first...";
+                    DrawText(flipText, 
+                            SCREEN_WIDTH/2 - MeasureText(flipText, 30)/2,
+                            100,
+                            30,
+                            BLACK);
+                }
+                
+                // show result after flip completes
+                if (!coinFlip.isFlipping) {
+                    const char* resultText = coinFlip.result ? "You go first!" : "AI goes first!";
+                    DrawText(resultText,
+                            SCREEN_WIDTH/2 - MeasureText(resultText, 40)/2,
+                            SCREEN_HEIGHT - 150,
+                            40,
+                            BLACK);
+                }
+                break;
+            // basically same as COIN_FLIP but parse different mode string
+            case COIN_FLIP_TWO_PLAYER:
+                DrawCoin(&coinFlip, "2-player");
+                if (coinFlip.isFlipping) {
+                    const char* flipText = "Flipping coin to decide who goes first...";
+                    DrawText(flipText, 
+                            SCREEN_WIDTH/2 - MeasureText(flipText, 30)/2,
+                            100,
+                            30,
+                            BLACK);
+                }
+                
+                if (!coinFlip.isFlipping) {
+                    const char* resultText = coinFlip.result ? "Player X goes first!" : "Player O goes first!";
+                    DrawText(resultText,
+                            SCREEN_WIDTH/2 - MeasureText(resultText, 40)/2,
+                            SCREEN_HEIGHT - 150,
+                            40,
+                            BLACK);
+                }
+                break;
+
             case GAME_VS_AI:
                 drawBoard(board, mousePos);
                 drawScoreboard(score, currentState);
@@ -437,6 +660,8 @@ int main(void) {
         EndDrawing();
     }
     unload_sound_effect(&click_sound);
+    unload_sound_effect(&coin_sound);
+    unload_sound_effect(&roundend_sound);
     cleanup_audio();
     CloseWindow();
     return 0;
@@ -588,13 +813,19 @@ void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty) {
         return;
     }
 
-    // Medium difficulty: 70% optimal move, 30% random
-    if (difficulty == MEDIUM && (rand() % 10) < 3) {
+    // Medium difficulty: 50% optimal move, 50% random
+    if (difficulty == MEDIUM && (rand() % 10) < 5) {
         makeRandomMove(board, ai);
         return;
     }
 
-    // Medium/Hard: Use minimax to find best move
+    // Hard difficulty: 80% optimal move, 20% random
+    if (difficulty == HARD && (rand() % 10) < 2){
+        makeRandomMove(board, ai);
+        return;
+    }
+
+    // Use minimax to find best move
     int bestScore = 1000;
     int bestMove[2] = {-1, -1};
 

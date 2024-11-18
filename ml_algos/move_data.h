@@ -7,7 +7,7 @@
 // Define the dataset structure
 typedef struct movedata
 {
-    char board[9]; // player 1 is 'X', player 2 is 'O', blank is 'b'
-    int outcome;   //
+    char board[3][3]; // player 1 is 'X', player 2 is 'O', blank is 'b'
+    int outcome;      //
 } MoveData;
 #endif

@@ -32,7 +32,7 @@ void board_to_features(char board[BOARD_SIZE], double features[BOARD_SIZE])
     }
 }
 
-void board_to_features_new(char board[BOARD_SIZE], double features[6], char type)
+void board_to_features_new(char board[SIZE][SIZE], double features[6], char type)
 {
     /*
     x0 = 1 constant
@@ -52,48 +52,28 @@ void board_to_features_new(char board[BOARD_SIZE], double features[6], char type
     }
 
     const char own_shape = type;
-    int own_rows = 0, own_cols = 0, own_diag = 0, en_rows = 0, en_cols = 0, en_diag = 0, emp_rows = 0, emp_cols = 0, emp_diag = 0;
-    for (int i = 0; i < BOARD_SIZE; i++)
+    for (int i = 0; i < 3; i++)
     {
-        if (board[i] == type)
+        int own_rows = 0, own_cols = 0, own_diag = 0, en_rows = 0, en_cols = 0, en_diag = 0, emp_rows = 0, emp_cols = 0, emp_diag = 0;
+        for (int j = 0; j < 3; j++)
         {
-            own_cols++, own_rows++;
-
-            // corner check
-            if (i == 0 || i == 2 || i == 6 || i == 8)
+            if (board[i][j] == 'b')
             {
-                features[4]++;
-                own_diag++;
+                emp_rows++;
             }
-            // centre piece check
-
-            if (i == 4)
+            else if (board[i][j] == 'type')
             {
-                features[3]++;
-                own_diag++;
+                own_rows++;
+            }
+            else
+            {
+                en_rows++;
             }
         }
-        else if (board[i] == opponent_type)
-        {
-            en_cols++, en_rows++;
-            // diag check
-            if (i % 2 == 0)
-            {
-                en_diag++;
-            }
-        }
-        else
-        {
-            emp_cols++, emp_rows++;
-            if (i % 2 == 0)
-            {
-                emp_diag++;
-            }
-        }
+        printf("own_rows:%d own_cols:%d own_diag:%d en_rows:%d en_cols:%d en_diag:%d emp_rows:%d emp_cols:%d emp_diag:%d \n", own_rows, own_cols, own_diag, en_rows, en_cols, en_diag, emp_rows, emp_cols, emp_diag);
     }
 
     //
-    printf("own_rows:%d own_cols:%d own_diag:%d en_rows:%d en_cols:%d en_diag:%d emp_rows:%d emp_cols:%d emp_diag:%d \n", own_rows, own_cols, own_diag, en_rows, en_cols, en_diag, emp_rows, emp_cols, emp_diag);
 }
 
 void initialize_weights(double weights[BOARD_SIZE], double weight)

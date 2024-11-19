@@ -1,0 +1,1 @@
+gcc linear_regression.c -o reg linearRegressionModel.c dataset_loader.c

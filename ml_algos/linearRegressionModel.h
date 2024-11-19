@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "move_data.h"
 
-#define BOARD_SIZE 9
+#define SIZE 3
 // Define the dataset structure
 
 typedef struct linearregressionmodel
@@ -16,7 +16,9 @@ typedef struct linearregressionmodel
     MoveData *dataset;
 } LinearRegressionModel;
 
-int predict(char board[BOARD_SIZE], LinearRegressionModel model);
+int predict(char board[SIZE][SIZE], LinearRegressionModel model, char type);
+
+void board_to_features(char board[SIZE][SIZE], int features[6], char type);
 
 void train(LinearRegressionModel *model, int verbose);
 
@@ -24,6 +26,6 @@ void evaluate(LinearRegressionModel *model);
 
 void shuffle_data(MoveData *dataset, int num_samples);
 
-LinearRegressionModel *new_model(double weights, double bias, double learning_rate, int epochs);
+LinearRegressionModel *new_model(double bias, double learning_rate, int epochs);
 
 #endif

@@ -14,22 +14,28 @@ int load_dataset(MoveData *dataset, char file_name[], int DATASET_LENGTH)
     }
 
     for (int i = 0; i < DATASET_LENGTH; i++)
-    {
-        char temp[9];
-        if (fscanf(file, "%s %d", temp, &(dataset->outcome)) != 2)
+    {        
+        char temp[10]=" ";
+        
+        // Read a 9-character board state and an integer outcome
+        int read_count = fscanf(file, "%s %d", temp, &dataset[i].outcome);
+                
+        // Check if fscanf read both values correctly
+        if (read_count != 2)
         {
             fprintf(stderr, "Error reading line %d\n", i);
-            break; // Exit loop if reading fails
+            break;  // Exit loop if reading fails
         }
         // set board
         for (int j = 0; j < 3; j++)
         {
             for (int k = 0; k < 3; k++)
             {
-                dataset[i].board[j][k];
+                dataset[i].board[j][k] = temp[j*3+k];
+                
             }
         }
-        dataset++; // Move to the next struct
+
     }
 
     fclose(file);

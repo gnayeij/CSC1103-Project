@@ -24,11 +24,15 @@ double game_to_value(char cell)
     }
 }
 
-void board_to_features(char board[BOARD_SIZE], double features[BOARD_SIZE])
+void board_to_features(char board[SIZE][SIZE], double features[BOARD_SIZE])
 {
-    for (int i = 0; i < BOARD_SIZE; i++)
+    //printf("Board to feature:\n");
+    for (int i = 0; i < 3; i++)
     {
-        features[i] = game_to_value(board[i]);
+       for(int j = 0; j < 3; j++){
+         features[i*3+j] = game_to_value(board[i][j]);
+         //printf("Feature %d i:%d j:%d : %f\n",i*3+j,i,j,features[i*3+j]);
+       }
     }
 }
 
@@ -54,24 +58,89 @@ void board_to_features_new(char board[SIZE][SIZE], double features[6], char type
     const char own_shape = type;
     for (int i = 0; i < 3; i++)
     {
-        int own_rows = 0, own_cols = 0, own_diag = 0, en_rows = 0, en_cols = 0, en_diag = 0, emp_rows = 0, emp_cols = 0, emp_diag = 0;
+        int own_rows = 0, own_cols = 0, en_rows = 0, en_cols = 0, emp_rows = 0, emp_cols = 0;
         for (int j = 0; j < 3; j++)
         {
-            if (board[i][j] == 'b')
+            if (board[i][j] == opponent_type)
             {
-                emp_rows++;
+                en_rows++;
             }
-            else if (board[i][j] == 'type')
+            else if (board[i][j] == type)
             {
                 own_rows++;
             }
             else
             {
-                en_rows++;
+                emp_rows++;
+            }
+            if(board[j][i] == opponent_type){
+                en_cols++;
+            }
+            else if(board[j][i] == type){
+                own_cols++;
+            }
+            else{
+                emp_cols++;
             }
         }
-        printf("own_rows:%d own_cols:%d own_diag:%d en_rows:%d en_cols:%d en_diag:%d emp_rows:%d emp_cols:%d emp_diag:%d \n", own_rows, own_cols, own_diag, en_rows, en_cols, en_diag, emp_rows, emp_cols, emp_diag);
-    }
+        if(own_rows == 2 && emp_rows == 1){
+            features[1]++;
+        }
+        if(en_rows == 2 && emp_rows == 1){
+            features[2]++;
+        }
+        if(own_cols == 2 && emp_cols == 1){
+            features[1]++;
+        }
+        if(en_cols == 2 && emp_cols == 1){
+            features[2]++;
+        }
+
+        if(own_rows == 1 && emp_rows == 2){
+            features[5]++;
+        }
+        if(own_cols == 1 && emp_cols == 2){
+            features[5]++;
+        }
+        if(own_rows == 3){
+            features[6]++;
+        }
+
+        for (int i = 0; i < 2; i++){
+            //diag check
+            int own_diag = 0, en_diag = 0, emp_diag = 0;
+            char diagonal;
+            for (int j = 0; j < SIZE; j++){
+                if(i==0){
+                    diagonal = board[2-j][j];
+                }
+                else{
+                    diagonal = board[j][j];
+                }
+                if(diagonal == type){
+                    own_diag++;
+                }
+                else if(diagonal == opponent_type){
+                    en_diag++;
+                }
+                else{
+                    emp_diag++;
+                }
+            }
+            if(own_diag == 2 && emp_diag == 1){
+                features[1]++;
+            }
+            if(en_diag == 2 && emp_diag == 1){
+                features[2]++;
+            }
+            if(own_diag == 1 && emp_diag == 2){
+                features[5]++;
+            }
+            if(own_diag == 3){
+                features[6]++;
+            }
+        }
+        }
 
     //
 }
@@ -112,8 +181,9 @@ double predict_wrap(double features[BOARD_SIZE], double weights[BOARD_SIZE], dou
     return best_move;
 }
 
-int predict(char board[BOARD_SIZE], LinearRegressionModel model, char type)
+int predict(char board[SIZE][SIZE], LinearRegressionModel model, char type)
 {
+    //printf("in predict:\n");
     double features[BOARD_SIZE] = {0};
     board_to_features(board, features);
     double prediction = predict_wrap(features, model.weights, *model.bias);
@@ -121,9 +191,9 @@ int predict(char board[BOARD_SIZE], LinearRegressionModel model, char type)
     return predicted_move;
 }
 
-int predict_new(char board[BOARD_SIZE], LinearRegressionModel model, char type)
+int predict_new(char board[SIZE][SIZE], LinearRegressionModel model, char type)
 {
-    double features[6] = {1};
+    double features[6] = {1,0,0,0,0,0};
     board_to_features_new(board, features, type);
 }
 
@@ -134,14 +204,16 @@ void train(LinearRegressionModel *model, int verbose)
 
     for (int epoch = 0; epoch < model->epochs; epoch++)
     {
-
+        //printf("Epoch: %d\n",epoch);
         double total_loss = 0.0;
         // shuffle dataset
         shuffle_data(model->dataset, DATASET_SIZE);
+        //printf("After shuffle\n");
         for (int i = 0; i < num_samples; i++)
         {
             double features[BOARD_SIZE] = {0};
             board_to_features(model->dataset[i].board, features);
+            //printf("After feature conversion\n");
 
             int predicted_move = predict(model->dataset[i].board, *model, 'x');
             int error = predicted_move - model->dataset[i].outcome;
@@ -217,6 +289,7 @@ LinearRegressionModel *new_model(double weight, double bias, double learning_rat
 {
 
     MoveData dataset[DATASET_SIZE];
+    printf("Loading:\n");
     MoveData *ptr = dataset;
     if (load_dataset(ptr, "tictac_single.txt", DATASET_SIZE) != 0)
     {

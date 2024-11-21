@@ -1,1 +1,1 @@
-gcc main.c backgroundmusic.c -o game.exe -O1 -Wall -std=c99 -Wno-missing-braces -I include/ -L lib/ -lraylib -lopengl32 -lgdi32 -lwinmm
+gcc main.c backgroundmusic.c ml_algos/linearRegressionModel.c ml_algos/dataset_loader.c -o game.exe -O1 -Wall -std=c99 -Wno-missing-braces -I include/ -L lib/ -lraylib -lopengl32 -lgdi32 -lwinmm

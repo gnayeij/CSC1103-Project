@@ -51,7 +51,8 @@ typedef struct {
 typedef enum {
     EASY = 1,
     MEDIUM = 2,
-    HARD = 3
+    HARD = 3,
+    IMPOSSIBLE = 4
 } AIDifficulty;
 
 // game mode button structure
@@ -66,6 +67,7 @@ typedef struct {
     Button easy;
     Button medium;
     Button hard;
+    Button impossible; 
 } DifficultyButtons;
 
 // function prototypes
@@ -106,6 +108,12 @@ DifficultyButtons initDifficultyButtons() {
     buttons.hard = (Button){
         .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + (BUTTON_HEIGHT + BUTTON_GAP)*2, BUTTON_WIDTH, BUTTON_HEIGHT},
         .text = "Hard",
+        .isHovered = false
+    };
+
+    buttons.impossible = (Button){
+        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + (BUTTON_HEIGHT + BUTTON_GAP)*3, BUTTON_WIDTH, BUTTON_HEIGHT},
+        .text = "Impossible",
         .isHovered = false
     };
     
@@ -183,7 +191,15 @@ void drawDifficultySelect(DifficultyButtons *buttons) {
             buttons->hard.bounds.x + (buttons->hard.bounds.width - MeasureText(buttons->hard.text, BUTTON_FONT_SIZE))/2,
             buttons->hard.bounds.y + (buttons->hard.bounds.height - BUTTON_FONT_SIZE)/2,
             BUTTON_FONT_SIZE, WHITE);
-            
+
+    // impossible button 
+    buttonColor = buttons->impossible.isHovered ? (Color){102, 102, 102, 255} : (Color){0, 0, 0, 255};
+    DrawRectangleRec(buttons->impossible.bounds, buttonColor);
+    DrawText(buttons->impossible.text,
+            buttons->impossible.bounds.x + (buttons->impossible.bounds.width - MeasureText(buttons->impossible.text, BUTTON_FONT_SIZE))/2,
+            buttons->impossible.bounds.y + (buttons->impossible.bounds.height - BUTTON_FONT_SIZE)/2,
+            BUTTON_FONT_SIZE, WHITE);
+
     // draw return instruction
     DrawText("Press 'E' to return to menu", 10, SCREEN_HEIGHT - 30, 20, DARKGRAY);
 }
@@ -326,6 +342,7 @@ int main(void) {
                 difficultyButtons.easy.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.easy.bounds);
                 difficultyButtons.medium.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.medium.bounds);
                 difficultyButtons.hard.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.hard.bounds);
+                difficultyButtons.impossible.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.impossible.bounds);
                 
                 // Handle button clicks
                 if (handleButton(&difficultyButtons.easy)) {
@@ -354,6 +371,17 @@ int main(void) {
                     play_sound_effect(&click_sound);
                     stop_background_music();
                     aiDifficulty = HARD;
+                    play_sound_effect(&coin_sound);
+                    currentState = COIN_FLIP;
+                    coinFlip.isFlipping = true;
+                    coinFlip.flipTime = 0;
+                    coinFlip.rotationAngle = 0;
+                    coinFlip.result = (rand() % 2) == 0;  // Random result
+                }
+                else if (handleButton(&difficultyButtons.impossible)) {
+                    play_sound_effect(&click_sound);
+                    stop_background_music();
+                    aiDifficulty = IMPOSSIBLE;
                     play_sound_effect(&coin_sound);
                     currentState = COIN_FLIP;
                     coinFlip.isFlipping = true;

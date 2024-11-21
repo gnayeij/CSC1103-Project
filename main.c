@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include "ml_algos/linearRegressionModel.h"
+
 
 #define SCREEN_WIDTH 900
 #define SCREEN_HEIGHT 1000
@@ -281,6 +283,11 @@ int main(void) {
     bool gameWon = false;
     bool gameOver = false;
 
+    //train linear regression model
+    LinearRegressionModel *model = new_model(0.0, 0.001,1000);
+    train(model, 0); //silent train
+    
+
     initializeBoard(board);
 
     while (!WindowShouldClose()) {
@@ -457,7 +464,18 @@ int main(void) {
                         
                         aiTimer += GetFrameTime();
                         if (aiTimer >= aiDelay) {
-                            aiMove(board, 'O', aiDifficulty);
+                            //medium check
+                            if(aiDifficulty == MEDIUM){
+                                //do prediction
+                                int prediction = predict(board, *model, 'O');
+                                int col = prediction % 3;
+                                int row = prediction / 3;
+                                makeMove(board,row,col,'O');
+                            }
+                            else{
+                                aiMove(board, 'O', aiDifficulty);
+                            }
+                            
                             gameWon = checkWin(board, currentPlayer);
                             if (gameWon || isBoardFull(board)) {
                                 play_sound_effect(&roundend_sound);

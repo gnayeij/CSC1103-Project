@@ -16,7 +16,7 @@ typedef struct
 } 
 MoveData;
 
-// Structure of Naive Bayes probabilities
+// Structure of Navie Bayes probabilities
 typedef struct 
 {
     double prob_x[TICTACTOE_ROWS][TICTACTOE_COLS][2]; // 'X' probabilities in each cell
@@ -25,13 +25,13 @@ typedef struct
     double prob_win; // Prior probability of winning
     double prob_lose; // Prior probability of losing
 } 
-NaiveBayesModel;
+NavieBayesModel;
 
 // Arrays to store Tic Tac Toe dataset and split it into training and test set
 MoveData dataset[TICTACTOE_DATASET];
 MoveData train_set[(int)(TICTACTOE_DATASET * TRAIN_TEST)];
 MoveData test_set[TICTACTOE_DATASET - (int)(TICTACTOE_DATASET * TRAIN_TEST)];
-NaiveBayesModel model;
+NavieBayesModel model;
 
 // Tic Tac Toe Board
 char board[TICTACTOE_ROWS][TICTACTOE_COLS] = 
@@ -82,7 +82,7 @@ void split_dataset()
     }
 }
 
-// Train the Naive Bayes Model using training data
+// Train the Navie Bayes Model using training data
 void train_nb() 
 {
     int win_count = 0, lose_count = 0;
@@ -135,7 +135,7 @@ void train_nb()
     model.prob_lose = (double)lose_count / train_size;
 }
 
-// Predict the game outcome using the Naive Bayes Model based on given Tic Tac Toe board state
+// Predict the game outcome using the Navie Bayes Model based on given Tic Tac Toe board state
 int predict(char board[TICTACTOE_ROWS][TICTACTOE_COLS]) 
 {
     double win_prob = model.prob_win;

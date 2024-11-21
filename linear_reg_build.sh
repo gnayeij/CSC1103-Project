@@ -1,0 +1,1 @@
+gcc linear_regression.c -o reg ml_algos/linearRegressionModel.c ml_algos/dataset_loader.c

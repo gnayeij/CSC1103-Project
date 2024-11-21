@@ -11,7 +11,7 @@
 // Function prototypes
 void printBoard(int board[SIZE][SIZE]);
 int checkWin(int board[SIZE][SIZE]);
-int minimax(int board[SIZE][SIZE], int depth, int isMaximizingPlayer, int alpha, int beta);
+int minimax(int board[SIZE][SIZE], int isMaximizingPlayer, int alpha, int beta);
 int movesLeft(int board[SIZE][SIZE]);
 int evaluateScore(int board[SIZE][SIZE]);
 void aiMove(int board[SIZE][SIZE], int player, int difficulty);
@@ -115,7 +115,7 @@ int evaluateScore(int board[SIZE][SIZE]) {
 }
 
 // Minimax function with alpha-beta pruning
-int minimax(int board[SIZE][SIZE], int depth, int isMaximizingPlayer, int alpha, int beta) {
+int minimax(int board[SIZE][SIZE], int isMaximizingPlayer, int alpha, int beta) {
     int score = evaluateScore(board);       // Evaluate current state of board
 
     // If X wins
@@ -138,7 +138,7 @@ int minimax(int board[SIZE][SIZE], int depth, int isMaximizingPlayer, int alpha,
                     board[i][j] = PLAYER;       // player move
 
                     // Call minimax recursively for the minimizing (Computer)
-                    best = (best > minimax(board, depth + 1, 0, alpha, beta)) ? best : minimax(board, depth + 1, 0, alpha, beta);
+                    best = (best > minimax(board, 0, alpha, beta)) ? best : minimax(board, 0, alpha, beta);
                     
                     // Undo all moves 
                     board[i][j] = EMPTY;
@@ -161,7 +161,7 @@ int minimax(int board[SIZE][SIZE], int depth, int isMaximizingPlayer, int alpha,
                     board[i][j] = COMPUTER;     // Computer turn
 
                     // Call minimax recursively for maximizing player (AI)
-                    best = (best < minimax(board, depth + 1, 1, alpha, beta)) ? best : minimax(board, depth + 1, 1, alpha, beta);
+                    best = (best < minimax(board, 1, alpha, beta)) ? best : minimax(board, 1, alpha, beta);
                     
                     // Undo all moves
                     board[i][j] = EMPTY;
@@ -207,7 +207,7 @@ void aiMove(int board[SIZE][SIZE], int player, int difficulty) {
                     board[i][j] = player;       // make move for player
                     
                     // get score for the move using minimax algorithm
-                    int moveVal = minimax(board, 0, player == COMPUTER, -1000, 1000);
+                    int moveVal = minimax(board, player == COMPUTER, -1000, 1000);
                     board[i][j] = EMPTY;    // undo move
 
                     // check if move is better than current move

@@ -3,14 +3,15 @@
 #include <string.h>
 #include <math.h>
 
-#define TICTACTOE_BOARD 9
+#define TICTACTOE_ROWS 3
+#define TICTACTOE_COLS 3
 #define TICTACTOE_DATASET 958
 #define TRAIN_TEST 0.8
 
 // Structure of Tic Tac Toe Game state and result
 typedef struct 
 {
-    char board[TICTACTOE_BOARD]; // Player 1 is 'X', Player 2 is 'O', Blank cell is 'b'
+    char board[TICTACTOE_ROWS][TICTACTOE_COLS]; // 3x3 Tic Tac Toe board: Player 1 symbol is 'X', Player 2 symbol is 'O', or blank cell is 'b'
     int outcome; // Win is '1', Lose is '0'
 } 
 MoveData;
@@ -18,9 +19,9 @@ MoveData;
 // Structure of Naive Bayes probabilities
 typedef struct 
 {
-    double prob_x[TICTACTOE_BOARD][2]; // 'X' probabilities in each cell
-    double prob_o[TICTACTOE_BOARD][2]; // 'O' probabilities in each cell
-    double prob_blank[TICTACTOE_BOARD][2]; // 'b' probabilities in each cell
+    double prob_x[TICTACTOE_ROWS][TICTACTOE_COLS][2]; // 'X' probabilities in each cell
+    double prob_o[TICTACTOE_ROWS][TICTACTOE_COLS][2]; // 'O' probabilities in each cell
+    double prob_blank[TICTACTOE_ROWS][TICTACTOE_COLS][2]; // 'b' probabilities in each cell
     double prob_win; // Prior probability of winning
     double prob_lose; // Prior probability of losing
 } 
@@ -32,11 +33,13 @@ MoveData train_set[(int)(TICTACTOE_DATASET * TRAIN_TEST)];
 MoveData test_set[TICTACTOE_DATASET - (int)(TICTACTOE_DATASET * TRAIN_TEST)];
 NaiveBayesModel model;
 
-// AI win counter
-int ai_win_count = 0;
-
 // Tic Tac Toe Board
-char board[TICTACTOE_BOARD] = {'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b'};
+char board[TICTACTOE_ROWS][TICTACTOE_COLS] = 
+{
+    {'b', 'b', 'b'},
+    {'b', 'b', 'b'},
+    {'b', 'b', 'b'}
+};
 
 // Load the dataset from file and populate moves array
 int load_dataset(const char *filename) 
@@ -50,7 +53,11 @@ int load_dataset(const char *filename)
 
     for (int i = 0; i < TICTACTOE_DATASET; i++) 
     {
-        fscanf(file, "%s %d", dataset[i].board, &dataset[i].outcome);
+        for (int row = 0; row < TICTACTOE_ROWS; row++) 
+        {
+            fscanf(file, "%s", dataset[i].board[row]);
+        }
+        fscanf(file, "%d", &dataset[i].outcome);
     }
 
     fclose(file);
@@ -88,33 +95,39 @@ void train_nb()
         else lose_count++;
 
         // Update each cell counts based on outcome of game
-        for (int j = 0; j < TICTACTOE_BOARD; j++) 
+        for (int row = 0; row < TICTACTOE_ROWS; row++) 
         {
-            if (train_set[i].outcome == 1) // Game outcome is win
+            for (int col = 0; col < TICTACTOE_COLS; col++) 
             {
-                if (train_set[i].board[j] == 'x') model.prob_x[j][1]++;
-                if (train_set[i].board[j] == 'o') model.prob_o[j][1]++;
-                if (train_set[i].board[j] == 'b') model.prob_blank[j][1]++;
-            } 
-            else // Game outcome is lose
-            {
-                if (train_set[i].board[j] == 'x') model.prob_x[j][0]++;
-                if (train_set[i].board[j] == 'o') model.prob_o[j][0]++;
-                if (train_set[i].board[j] == 'b') model.prob_blank[j][0]++;
+                if (train_set[i].outcome == 1) // Game outcome is win
+                {
+                    if (train_set[i].board[row][col] == 'x') model.prob_x[row][col][1]++;
+                    if (train_set[i].board[row][col] == 'o') model.prob_o[row][col][1]++;
+                    if (train_set[i].board[row][col] == 'b') model.prob_blank[row][col][1]++;
+                } 
+                else // Game outcome is lose
+                {
+                    if (train_set[i].board[row][col] == 'x') model.prob_x[row][col][0]++;
+                    if (train_set[i].board[row][col] == 'o') model.prob_o[row][col][0]++;
+                    if (train_set[i].board[row][col] == 'b') model.prob_blank[row][col][0]++;
+                }
             }
         }
     }
 
     // Calculate the probability from counts
-    for (int j = 0; j < TICTACTOE_BOARD; j++) 
+    for (int row = 0; row < TICTACTOE_ROWS; row++) 
     {
-        model.prob_x[j][1] /= win_count;
-        model.prob_o[j][1] /= win_count;
-        model.prob_blank[j][1] /= win_count;
+        for (int col = 0; col < TICTACTOE_COLS; col++) 
+        {
+            model.prob_x[row][col][1] /= win_count;
+            model.prob_o[row][col][1] /= win_count;
+            model.prob_blank[row][col][1] /= win_count;
 
-        model.prob_x[j][0] /= lose_count;
-        model.prob_o[j][0] /= lose_count;
-        model.prob_blank[j][0] /= lose_count;
+            model.prob_x[row][col][0] /= lose_count;
+            model.prob_o[row][col][0] /= lose_count;
+            model.prob_blank[row][col][0] /= lose_count;
+        }
     }
 
     // Set overall win and lose probabilities
@@ -123,27 +136,30 @@ void train_nb()
 }
 
 // Predict the game outcome using the Naive Bayes Model based on given Tic Tac Toe board state
-int predict(char *board) 
+int predict(char board[TICTACTOE_ROWS][TICTACTOE_COLS]) 
 {
     double win_prob = model.prob_win;
     double lose_prob = model.prob_lose;
 
-    for (int i = 0; i < TICTACTOE_BOARD; i++) 
+    for (int row = 0; row < TICTACTOE_ROWS; row++) 
     {
-        if (board[i] == 'x') 
+        for (int col = 0; col < TICTACTOE_COLS; col++) 
         {
-            win_prob *= model.prob_x[i][1];
-            lose_prob *= model.prob_x[i][0];
-        } 
-        else if (board[i] == 'o') 
-        {
-            win_prob *= model.prob_o[i][1];
-            lose_prob *= model.prob_o[i][0];
-        } 
-        else 
-        {
-            win_prob *= model.prob_blank[i][1];
-            lose_prob *= model.prob_blank[i][0];
+            if (board[row][col] == 'x') 
+            {
+                win_prob *= model.prob_x[row][col][1];
+                lose_prob *= model.prob_x[row][col][0];
+            } 
+            else if (board[row][col] == 'o') 
+            {
+                win_prob *= model.prob_o[row][col][1];
+                lose_prob *= model.prob_o[row][col][0];
+            } 
+            else 
+            {
+                win_prob *= model.prob_blank[row][col][1];
+                lose_prob *= model.prob_blank[row][col][0];
+            }
         }
     }
 
@@ -154,10 +170,13 @@ int predict(char *board)
 void print_board() 
 {
     printf("Current Board:\n");
-    for (int i = 0; i < TICTACTOE_BOARD; i++) 
+    for (int row = 0; row < TICTACTOE_ROWS; row++) 
     {
-        printf("%c ", board[i] == 'b' ? '_' : board[i]);
-        if ((i + 1) % 3 == 0) printf("\n");
+        for (int col = 0; col < TICTACTOE_COLS; col++) 
+        {
+            printf("%c ", board[row][col] == 'b' ? '_' : board[row][col]);
+        }
+        printf("\n");
     }
     printf("\n");
 }
@@ -173,11 +192,16 @@ int main()
     split_dataset();
     train_nb();
 
-    // Test a prediction example (modify board state as needed)
-    char test_board[TICTACTOE_BOARD] = {'x', 'o', 'x', 'o', 'x', 'o', 'b', 'b', 'b'};
+    char test_board[TICTACTOE_ROWS][TICTACTOE_COLS] = 
+    {
+        {'x', 'o', 'x'},
+        {'o', 'x', 'o'},
+        {'b', 'b', 'b'}
+    };
+
     int prediction = predict(test_board);
 
-    printf("Prediction for the given board: %s\n", prediction == 1 ? "Win" : "Lose");
+    printf("Prediction for the given Tic Tac Toe board: %s\n", prediction == 1 ? "Win" : "Lose");
 
     return 0;
 }

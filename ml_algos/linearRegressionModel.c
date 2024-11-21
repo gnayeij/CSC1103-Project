@@ -8,7 +8,8 @@
 #include "linearRegressionModel.h"
 
 #define DATASET_SIZE 958
-#define BOARD_SIZE 9
+#define BOARD_TOTAL_SIZE 9
+
 
 void print_board(char board[SIZE][SIZE])
 {
@@ -24,7 +25,7 @@ void print_board(char board[SIZE][SIZE])
     printf("\n");
 }
 
-double eval_approximation(int features[7], double weights[7], double bias)
+double eval_approximation(int features[7], double weights[7])
 {
     double score = 0.0;
     for (int i = 0; i < 7; i++)
@@ -47,10 +48,10 @@ void board_to_features(char board[SIZE][SIZE], int features[7], char type)
     */
 
     // determine opponent shape
-    char opponent_type = 'o';
-    if (type == 'o')
+    char opponent_type = 'O';
+    if (type == 'O')
     {
-        opponent_type = 'x';
+        opponent_type = 'X';
     }
 
     if (board[1][1] == type)
@@ -137,7 +138,9 @@ void board_to_features(char board[SIZE][SIZE], int features[7], char type)
         {
             features[6]++;
         }
-        for (int i = 0; i < 2; i++)
+    }
+
+    for (int i = 0; i < 2; i++)
         {
             // diag check
             int own_diag = 0, en_diag = 0, emp_diag = 0;
@@ -182,9 +185,6 @@ void board_to_features(char board[SIZE][SIZE], int features[7], char type)
                 features[6]++;
             }
         }
-    }
-
-    //
 }
 
 void initialize_weights(double weights[7])
@@ -195,17 +195,18 @@ void initialize_weights(double weights[7])
     }
 }
 
+
 int predict(char board[SIZE][SIZE], LinearRegressionModel model, char type)
 {
     int counter = 0;
-    char(*boards)[SIZE][SIZE] = malloc(BOARD_SIZE * sizeof(char[SIZE][SIZE]));
-    int *moves = malloc(BOARD_SIZE * sizeof(int));
+    char(*boards)[SIZE][SIZE] = malloc(BOARD_TOTAL_SIZE * sizeof(char[SIZE][SIZE]));
+    int *moves = malloc(BOARD_TOTAL_SIZE * sizeof(int));
     // print_board(board);
     for (int i = 0; i < SIZE; i++)
     {
         for (int j = 0; j < SIZE; j++)
         {
-            if (board[i][j] == 'b')
+            if (board[i][j] == 'B' || board[i][j] == ' ')
             {
                 // print
                 // printf("blank found at index: %d %d\n", i, j);
@@ -228,19 +229,12 @@ int predict(char board[SIZE][SIZE], LinearRegressionModel model, char type)
     {
         int features[7] = {1, 0, 0, 0, 0, 0, 0};
         board_to_features(boards[i], features, type);
-        // printf("Features: ");
-        // for (int j = 0; j < 7; j++)
-        // {
-        //     printf("feature %d: %d\n", j, features[j]);
-        // }
-        double prediction = eval_approximation(features, model.weights, *model.bias);
-        // print_board(boards[i]);
-        // printf("predicted score: %.2f\n", prediction);
+
+        double prediction = eval_approximation(features, model.weights);
         if (val < prediction)
         {
             val = prediction;
             best_move = moves[i];
-            // printf("New best move: %d\n", best_move);
         }
     }
     return best_move;
@@ -248,7 +242,7 @@ int predict(char board[SIZE][SIZE], LinearRegressionModel model, char type)
 
 void train(LinearRegressionModel *model, int verbose)
 {
-    printf("Starting training with following parameters: Weight: %.2f, Bias: %.2f, Learning Rate: %.2f, Epochs: %d...\n", model->weights, model->bias, model->learning_rate, model->epochs);
+    printf("Starting training with following parameters: Learning Rate: %.4f, Epochs: %d...\n",  model->learning_rate, model->epochs);
     int num_samples = DATASET_SIZE * 0.8;
 
     for (int epoch = 0; epoch < model->epochs; epoch++)
@@ -272,10 +266,9 @@ void train(LinearRegressionModel *model, int verbose)
             {
                 model->weights[j] += model->learning_rate * (error * features[j] - 0.01 * model->weights[j]);
 
+
                 // printf("weight %d: feature: %d error: %d weight value: %.2f\n", j, features[j], error, model->weights[j]);
             }
-            *model->bias -= model->learning_rate * error;
-            // printf("Bias for epoch %d: %.2f, minused: %.2f\n", epoch, *model->bias, model->learning_rate * error);
         }
 
         total_loss /= num_samples;
@@ -289,13 +282,14 @@ void train(LinearRegressionModel *model, int verbose)
             printf(" Epoch %d, Training loss for current epoch: %f\n", epoch, total_loss);
         }
     }
+    printf("Training complete for Linear Regression Model!\n");
 }
 
 void evaluate(LinearRegressionModel *model)
 {
     int num_samples = DATASET_SIZE * 0.2;
     int correct_predictions = 0;
-    int predictions[BOARD_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    int predictions[BOARD_TOTAL_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
     for (int i = DATASET_SIZE - num_samples; i < DATASET_SIZE; i++)
     {
@@ -313,7 +307,7 @@ void evaluate(LinearRegressionModel *model)
     double accuracy = (double)correct_predictions / num_samples * 100;
     printf("Accuracy for testing set: %.2f%%\n", accuracy);
     printf("Number of picks per slot: ");
-    for (int i = 0; i < BOARD_SIZE; i++)
+    for (int i = 0; i < BOARD_TOTAL_SIZE; i++)
     {
         printf("%d:%d ", i, predictions[i]);
     }
@@ -337,7 +331,7 @@ LinearRegressionModel *new_model(double bias, double learning_rate, int epochs)
     MoveData dataset[DATASET_SIZE];
     printf("Loading:\n");
     MoveData *ptr = dataset;
-    if (load_dataset(ptr, "tictac_single.txt", DATASET_SIZE) != 0)
+    if (load_dataset(ptr, "ml_algos/tictac_single.txt", DATASET_SIZE) != 0)
     {
         fprintf(stderr, "Dataset loading failed.\n");
         return NULL;
@@ -347,10 +341,8 @@ LinearRegressionModel *new_model(double bias, double learning_rate, int epochs)
 
     shuffle_data(dataset, DATASET_SIZE); // shuffling data for randomness
     LinearRegressionModel *model = (LinearRegressionModel *)malloc(sizeof(LinearRegressionModel));
-    model->weights = (double *)malloc(BOARD_SIZE * sizeof(double));
+    model->weights = (double *)malloc(BOARD_TOTAL_SIZE * sizeof(double));
     initialize_weights(model->weights);
-    model->bias = (double *)malloc(sizeof(double));
-    *(model->bias) = bias;
     model->learning_rate = learning_rate;
     model->epochs = epochs;
     model->dataset = (MoveData *)malloc(DATASET_SIZE * sizeof(MoveData));

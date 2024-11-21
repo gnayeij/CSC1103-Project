@@ -10,7 +10,6 @@
 typedef struct linearregressionmodel
 {
     double *weights; // weight is 0 for all cells on the board.
-    double *bias;
     double learning_rate;
     int epochs;
     MoveData *dataset;
@@ -18,7 +17,7 @@ typedef struct linearregressionmodel
 
 int predict(char board[SIZE][SIZE], LinearRegressionModel model, char type);
 
-void board_to_features(char board[SIZE][SIZE], int features[6], char type);
+void board_to_features(char board[SIZE][SIZE], int features[7], char type);
 
 void train(LinearRegressionModel *model, int verbose);
 

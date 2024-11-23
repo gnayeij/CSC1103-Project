@@ -18,6 +18,10 @@
 #define BUTTON_FONT_SIZE 40
 #define SCOREBOARD_Y (CELL_SIZE * BOARD_SIZE + 20)
 
+// Naive Bayes Model
+#define TICTACTOE_DATASET 958
+#define TRAIN_TEST 0.8
+
 // game states
 typedef enum {
     LOBBY,
@@ -50,9 +54,10 @@ typedef struct {
 // AI difficulty levels
 typedef enum {
     EASY = 1,
-    MEDIUM = 2,
-    HARD = 3,
-    IMPOSSIBLE = 4
+    DIFFICULTY_NB = 2,
+    MEDIUM = 3,
+    HARD = 4,
+    IMPOSSIBLE = 5
 } AIDifficulty;
 
 // game mode button structure
@@ -68,6 +73,7 @@ typedef struct {
     Button medium;
     Button hard;
     Button impossible; 
+    Button difficulty_nb;
 } DifficultyButtons;
 
 // function prototypes
@@ -88,6 +94,12 @@ void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty);
 void makeRandomMove(char board[BOARD_SIZE][BOARD_SIZE], char player);
 int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai);
 
+int nb_load_dataset(const char *filename);
+void split_dataset();
+void train_nb();
+int nb_predict(char board[BOARD_SIZE][BOARD_SIZE]);
+void nb_ai_move(char board[BOARD_SIZE][BOARD_SIZE]);
+
 // initialize difficulty selection buttons
 DifficultyButtons initDifficultyButtons() {
     DifficultyButtons buttons;
@@ -95,25 +107,31 @@ DifficultyButtons initDifficultyButtons() {
     
     buttons.easy = (Button){
         .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY, BUTTON_WIDTH, BUTTON_HEIGHT},
-        .text = "Easy",
+        .text = "Level 1",
         .isHovered = false
     };
     
-    buttons.medium = (Button){
+    buttons.difficulty_nb = (Button){
         .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + BUTTON_HEIGHT + BUTTON_GAP, BUTTON_WIDTH, BUTTON_HEIGHT},
-        .text = "Medium",
+        .text = "Level 2",
+        .isHovered = false
+    };
+
+    buttons.medium = (Button){
+        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + (BUTTON_HEIGHT + BUTTON_GAP)*2, BUTTON_WIDTH, BUTTON_HEIGHT},
+        .text = "Level 3",
         .isHovered = false
     };
     
     buttons.hard = (Button){
-        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + (BUTTON_HEIGHT + BUTTON_GAP)*2, BUTTON_WIDTH, BUTTON_HEIGHT},
-        .text = "Hard",
+        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + (BUTTON_HEIGHT + BUTTON_GAP)*3, BUTTON_WIDTH, BUTTON_HEIGHT},
+        .text = "Level 4",
         .isHovered = false
     };
 
     buttons.impossible = (Button){
-        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + (BUTTON_HEIGHT + BUTTON_GAP)*3, BUTTON_WIDTH, BUTTON_HEIGHT},
-        .text = "Impossible",
+        .bounds = (Rectangle){SCREEN_WIDTH/2 - BUTTON_WIDTH/2, startY + (BUTTON_HEIGHT + BUTTON_GAP)*4, BUTTON_WIDTH, BUTTON_HEIGHT},
+        .text = "Level Impossible",
         .isHovered = false
     };
     
@@ -175,7 +193,15 @@ void drawDifficultySelect(DifficultyButtons *buttons) {
             buttons->easy.bounds.x + (buttons->easy.bounds.width - MeasureText(buttons->easy.text, BUTTON_FONT_SIZE))/2,
             buttons->easy.bounds.y + (buttons->easy.bounds.height - BUTTON_FONT_SIZE)/2,
             BUTTON_FONT_SIZE, WHITE);
-            
+
+    // difficulty_nb button
+    buttonColor = buttons->difficulty_nb.isHovered ? (Color){219, 204, 35, 255} : (Color){255,237,41, 255};
+    DrawRectangleRec(buttons->difficulty_nb.bounds, buttonColor);
+    DrawText(buttons->difficulty_nb.text,
+            buttons->difficulty_nb.bounds.x + (buttons->difficulty_nb.bounds.width - MeasureText(buttons->difficulty_nb.text, BUTTON_FONT_SIZE))/2,
+            buttons->difficulty_nb.bounds.y + (buttons->difficulty_nb.bounds.height - BUTTON_FONT_SIZE)/2,
+            BUTTON_FONT_SIZE, WHITE);
+
     // medium button
     buttonColor = buttons->medium.isHovered ? (Color){219, 164, 0, 255} : (Color){255,206,27, 255};
     DrawRectangleRec(buttons->medium.bounds, buttonColor);
@@ -211,6 +237,16 @@ int main(void) {
     SetTextLineSpacing(16);         // set line spacing for multiline text (when line breaks are included '\n')
 
     SetTargetFPS(60);
+
+    // initialize dataset for Navie Bayes Model
+    if (nb_load_dataset("ml_algos/tic-tac-toe.txt") != 0) 
+    {
+        return 1;
+    }
+
+    split_dataset();
+    train_nb();
+
 
     const char* fxBGM = "resources/background-music.mp3";
     if (init_BGM_audio(fxBGM) != 0) {
@@ -340,6 +376,7 @@ int main(void) {
             case DIFFICULTY_SELECT:
                 // Update button hover states
                 difficultyButtons.easy.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.easy.bounds);
+                difficultyButtons.difficulty_nb.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.difficulty_nb.bounds);
                 difficultyButtons.medium.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.medium.bounds);
                 difficultyButtons.hard.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.hard.bounds);
                 difficultyButtons.impossible.isHovered = CheckCollisionPointRec(mousePos, difficultyButtons.impossible.bounds);
@@ -349,6 +386,17 @@ int main(void) {
                     play_sound_effect(&click_sound);
                     stop_background_music();
                     aiDifficulty = EASY;
+                    play_sound_effect(&coin_sound);
+                    currentState = COIN_FLIP;
+                    coinFlip.isFlipping = true;
+                    coinFlip.flipTime = 0;
+                    coinFlip.rotationAngle = 0;
+                    coinFlip.result = (rand() % 2) == 0;  // Random result
+                }
+                else if (handleButton(&difficultyButtons.difficulty_nb)) {
+                    play_sound_effect(&click_sound);
+                    stop_background_music();
+                    aiDifficulty = DIFFICULTY_NB;
                     play_sound_effect(&coin_sound);
                     currentState = COIN_FLIP;
                     coinFlip.isFlipping = true;
@@ -494,11 +542,13 @@ int main(void) {
                         if (aiTimer >= aiDelay) {
                             //medium check
                             if(aiDifficulty == MEDIUM){
-                                //do prediction
+                                // using linear regression model
                                 int prediction = predict(board, *model, 'O');
                                 int col = prediction % 3;
                                 int row = prediction / 3;
                                 makeMove(board,row,col,'O');
+                            } else if (aiDifficulty == DIFFICULTY_NB){
+                                nb_ai_move(board); // using navie bayes model
                             }
                             else{
                                 aiMove(board, 'O', aiDifficulty);
@@ -950,4 +1000,197 @@ int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, ch
         }
         return bestScore;
     }
+}
+
+// Arrays to store Tic Tac Toe dataset and split it into training and test set
+typedef struct 
+{
+    char board[BOARD_SIZE][BOARD_SIZE];
+    int outcome;
+} MoveData_nb;
+
+// Structure of NB Probabilities
+typedef struct
+{
+    double prob_x[BOARD_SIZE][BOARD_SIZE][2];
+    double prob_o[BOARD_SIZE][BOARD_SIZE][2];
+    double prob_blank[BOARD_SIZE][BOARD_SIZE][2];
+    double prob_win;
+    double prob_lose;
+} NavieBayesModel;
+
+MoveData_nb dataset[TICTACTOE_DATASET];
+MoveData_nb train_set[(int)(TICTACTOE_DATASET * TRAIN_TEST)];
+MoveData_nb test_set[TICTACTOE_DATASET - (int)(TICTACTOE_DATASET * TRAIN_TEST)];
+NavieBayesModel nb_model;
+
+int nb_load_dataset(const char *filename){
+    FILE *file = fopen(filename, "r");
+    if (!file) 
+    {
+        perror("Error! Tic Tac Toe Dataset unable to be loaded.");
+        return -1;
+    }
+    for (int i = 0; i < TICTACTOE_DATASET; i++) 
+    {
+        for (int row = 0; row < BOARD_SIZE; row++) 
+        {
+            fscanf(file, "%s", dataset[i].board[row]);
+        }
+        fscanf(file, "%d", &dataset[i].outcome);
+    }
+
+    fclose(file);
+    return 0;
+}
+
+// Split the dataset into train and test sets based on TRAIN_TEST
+void split_dataset() 
+{
+    int train_size = (int)(TICTACTOE_DATASET * TRAIN_TEST);
+    
+    // Fill training set up to train_size
+    for (int i = 0; i < train_size; i++) 
+    {
+        train_set[i] = dataset[i];
+    }
+
+    // Put remaining data into the test set
+    for (int i = train_size; i < TICTACTOE_DATASET; i++) 
+    {
+        test_set[i - train_size] = dataset[i];
+    }
+}
+
+// Train the Navie Bayes Model using training data
+void train_nb() 
+{
+    int win_count = 0, lose_count = 0;
+    int train_size = (int)(TICTACTOE_DATASET * TRAIN_TEST);
+
+    // Loop through the training set, counting both wins and losses
+    for (int i = 0; i < train_size; i++) 
+    {
+        if (train_set[i].outcome == 1) win_count++;
+        else lose_count++;
+
+        // Update each cell counts based on outcome of game
+        for (int row = 0; row < BOARD_SIZE; row++) 
+        {
+            for (int col = 0; col < BOARD_SIZE; col++) 
+            {
+                if (train_set[i].outcome == 1) // Game outcome is win
+                {
+                    if (train_set[i].board[row][col] == 'X') nb_model.prob_x[row][col][1]++;
+                    if (train_set[i].board[row][col] == 'O') nb_model.prob_o[row][col][1]++;
+                    if (train_set[i].board[row][col] == ' ') nb_model.prob_blank[row][col][1]++;
+                } 
+                else // Game outcome is lose
+                {
+                    if (train_set[i].board[row][col] == 'X') nb_model.prob_x[row][col][0]++;
+                    if (train_set[i].board[row][col] == 'O') nb_model.prob_o[row][col][0]++;
+                    if (train_set[i].board[row][col] == ' ') nb_model.prob_blank[row][col][0]++;
+                }
+            }
+        }
+    }
+
+    // Calculate the probability from counts
+    for (int row = 0; row < BOARD_SIZE; row++) 
+    {
+        for (int col = 0; col < BOARD_SIZE; col++) 
+        {
+            nb_model.prob_x[row][col][1] /= win_count;
+            nb_model.prob_o[row][col][1] /= win_count;
+            nb_model.prob_blank[row][col][1] /= win_count;
+
+            nb_model.prob_x[row][col][0] /= lose_count;
+            nb_model.prob_o[row][col][0] /= lose_count;
+            nb_model.prob_blank[row][col][0] /= lose_count;
+        }
+    }
+
+    // Set overall win and lose probabilities
+    nb_model.prob_win = (double)win_count / train_size;
+    nb_model.prob_lose = (double)lose_count / train_size;
+}
+
+// Predict the game outcome using the Navie Bayes Model based on given Tic Tac Toe board state
+int nb_predict(char board[BOARD_SIZE][BOARD_SIZE]) 
+{
+    double win_prob = nb_model.prob_win;
+    double lose_prob = nb_model.prob_lose;
+
+    for (int row = 0; row < BOARD_SIZE; row++) 
+    {
+        for (int col = 0; col < BOARD_SIZE; col++) 
+        {
+            if (board[row][col] == 'X') 
+            {
+                win_prob *= nb_model.prob_x[row][col][1];
+                lose_prob *= nb_model.prob_x[row][col][0];
+            } 
+            else if (board[row][col] == 'O') 
+            {
+                win_prob *= nb_model.prob_o[row][col][1];
+                lose_prob *= nb_model.prob_o[row][col][0];
+            } 
+            else 
+            {
+                win_prob *= nb_model.prob_blank[row][col][1];
+                lose_prob *= nb_model.prob_blank[row][col][0];
+            }
+        }
+    }
+
+    return win_prob > lose_prob ? 1 : 0; // Return '1' for win, '0' for lose
+}
+
+void nb_ai_move(char board[BOARD_SIZE][BOARD_SIZE]) 
+{
+    int best_row = -1;
+    int best_col = -1;
+    double highest_prob = -1.0;
+
+    // Check each possible move on the board to see which has the highest chance to win
+    for (int row = 0; row < BOARD_SIZE; row++)
+    {
+        for (int col = 0; col < BOARD_SIZE; col++) 
+        {
+            if (board[row][col] == ' ') // Empty cell
+            { 
+                board[row][col] = 'O'; // Make the move tentatively
+
+                // Predict the outcome if this move is made on empty cell
+                double win_prob = nb_model.prob_win; // Use Naive Bayes winning probability
+                if (nb_predict(board) == 1) 
+                { 
+                    win_prob *= nb_model.prob_win; // AI's predicted move leads to a win
+                } 
+
+                else 
+                {
+                    win_prob *= nb_model.prob_lose;
+                }
+
+                // Track the move with the highest winning probability
+                if (win_prob > highest_prob) 
+                {
+                    highest_prob = win_prob;
+                    best_row = row;
+                    best_col = col;
+                }
+
+                board[row][col] = ' '; // Undo the move after evaluation
+            }
+        }
+    }
+
+
+    // Make the best move found
+    if (best_row != -1 && best_col != -1) 
+    {
+        board[best_row][best_col] = 'O';
+    } 
+
 }

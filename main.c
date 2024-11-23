@@ -76,6 +76,17 @@ typedef struct {
     Button difficulty_nb;
 } DifficultyButtons;
 
+// volume control structure
+typedef struct {
+    Rectangle iconBounds;
+    Rectangle sliderBounds;
+    Rectangle sliderHandle;
+    bool isHovered;
+    bool isSliderVisible;
+    float currentVolume;
+    Texture2D iconTexture;  // For storing the speaker icon
+} VolumeControl;
+
 // function prototypes
 void initializeBoard(char board[BOARD_SIZE][BOARD_SIZE]);
 void drawBoard(char board[BOARD_SIZE][BOARD_SIZE], Vector2 mousePos);
@@ -89,6 +100,12 @@ void drawScoreboard(Score score, GameState gameState);
 void updateScore(Score *score, bool gameWon, char currentPlayer);
 
 void drawDifficultySelect(DifficultyButtons *buttons);
+
+void initVolumeControl(VolumeControl *volumeControl);
+void updateVolumeControl(VolumeControl *volumeControl);
+void drawVolumeControl(VolumeControl *volumeControl);
+void unloadVolumeControl(VolumeControl *volumeControl);
+float custom_clamp(float value, float min, float max);
 
 void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty);
 void makeRandomMove(char board[BOARD_SIZE][BOARD_SIZE], char player);
@@ -278,7 +295,8 @@ int main(void) {
     }
 
     start_background_music();
-    set_music_volume(0.2f);
+    VolumeControl volumeControl;
+    initVolumeControl(&volumeControl);
 
     // initialize coin flip
     CoinFlip coinFlip = {
@@ -349,7 +367,7 @@ int main(void) {
             case LOBBY:    
                 twoPlayerButton.isHovered = CheckCollisionPointRec(GetMousePosition(), twoPlayerButton.bounds);
                 onePlayerButton.isHovered = CheckCollisionPointRec(GetMousePosition(), onePlayerButton.bounds);
-
+                updateVolumeControl(&volumeControl);
                 if (handleButton(&twoPlayerButton)) {
                     play_sound_effect(&click_sound);
                     stop_background_music();
@@ -650,6 +668,7 @@ int main(void) {
         switch (currentState) {
             case LOBBY:
                 drawLobby(&twoPlayerButton, &onePlayerButton, fontBm);
+                drawVolumeControl(&volumeControl);
                 break;
 
             case DIFFICULTY_SELECT:
@@ -759,6 +778,7 @@ int main(void) {
     unload_sound_effect(&coin_sound);
     unload_sound_effect(&roundend_sound);
     cleanup_audio();
+    unloadVolumeControl(&volumeControl);
     CloseWindow();
     return 0;
 }
@@ -1193,4 +1213,128 @@ void nb_ai_move(char board[BOARD_SIZE][BOARD_SIZE])
         board[best_row][best_col] = 'O';
     } 
 
+}
+
+void initVolumeControl(VolumeControl *volumeControl) {
+    // position the volume icon in the bottom right corner
+    volumeControl->iconBounds = (Rectangle){
+        SCREEN_WIDTH - 50,  // 50 pixels from right edge
+        SCREEN_HEIGHT - 50, // 50 pixels from bottom
+        40,                 // icon width
+        40                  // icon height
+    };
+    
+    // initialize the slider (initially was hidden)
+    volumeControl->sliderBounds = (Rectangle){
+        SCREEN_WIDTH - 200,         // 200 pixels from right edge
+        SCREEN_HEIGHT - 45,         // 45 pixels from bottom
+        140,                        // slider width
+        30                          // slider height
+    };
+    
+    volumeControl->currentVolume = 0.2f;  // initial default volume
+    volumeControl->isHovered = false;
+    volumeControl->isSliderVisible = false;
+    
+    // calculate initial slider handle position
+    volumeControl->sliderHandle = (Rectangle){
+        volumeControl->sliderBounds.x + (volumeControl->sliderBounds.width * volumeControl->currentVolume),
+        volumeControl->sliderBounds.y + 5,
+        10,
+        20
+    };
+
+    // load the speaker icon texture
+    Image img = LoadImage("resources/speaker-icon.png");
+    ImageResize(&img, 40, 40);  // Resize to match icon bounds
+    volumeControl->iconTexture = LoadTextureFromImage(img);
+    UnloadImage(img);
+}
+
+void updateVolumeControl(VolumeControl *volumeControl) {
+    Vector2 mousePos = GetMousePosition();
+    
+    // check if mouse is hovering over icon or slider
+    volumeControl->isHovered = CheckCollisionPointRec(mousePos, volumeControl->iconBounds) ||
+                              (volumeControl->isSliderVisible && 
+                               CheckCollisionPointRec(mousePos, (Rectangle){
+                                   volumeControl->sliderBounds.x - 10,
+                                   volumeControl->sliderBounds.y - 10,
+                                   volumeControl->sliderBounds.width + 20,
+                                   volumeControl->sliderBounds.height + 20
+                               }));
+    
+    // show/hide slider based on hover state
+    volumeControl->isSliderVisible = volumeControl->isHovered;
+    
+    // handle volume adjustment
+    if (volumeControl->isSliderVisible && IsMouseButtonDown(MOUSE_LEFT_BUTTON) &&
+        CheckCollisionPointRec(mousePos, (Rectangle){
+            volumeControl->sliderBounds.x - 5,
+            volumeControl->sliderBounds.y - 5,
+            volumeControl->sliderBounds.width + 10,
+            volumeControl->sliderBounds.height + 10
+        })) {
+        // calculate new volume based on mouse position
+        float newVolume = (mousePos.x - volumeControl->sliderBounds.x) / volumeControl->sliderBounds.width;
+        volumeControl->currentVolume = custom_clamp(newVolume, 0.0f, 1.0f);
+        
+        // update slider handle position
+        volumeControl->sliderHandle.x = volumeControl->sliderBounds.x + 
+                                      (volumeControl->sliderBounds.width * volumeControl->currentVolume) - 
+                                      (volumeControl->sliderHandle.width / 2);
+        
+        // update actual music volume
+        set_music_volume(volumeControl->currentVolume);
+    }
+}
+
+void drawVolumeControl(VolumeControl *volumeControl) {
+    // draw icon background when hovered
+    if (volumeControl->isHovered) {
+        DrawRectangleRec(volumeControl->iconBounds, DARKGRAY);
+    }
+    
+    // draw the speaker icon texture
+    DrawTexture(volumeControl->iconTexture, 
+                volumeControl->iconBounds.x, 
+                volumeControl->iconBounds.y, 
+                volumeControl->isHovered ? GRAY : WHITE);
+    
+    // draw slider when visible
+    if (volumeControl->isSliderVisible) {
+        // draw slider background
+        DrawRectangleRec(volumeControl->sliderBounds, LIGHTGRAY);
+        
+        // draw filled portion of slider
+        DrawRectangle(
+            volumeControl->sliderBounds.x,
+            volumeControl->sliderBounds.y,
+            volumeControl->sliderBounds.width * volumeControl->currentVolume,
+            volumeControl->sliderBounds.height,
+            GRAY
+        );
+        
+        // draw slider handle
+        DrawRectangleRec(volumeControl->sliderHandle, DARKGRAY);
+        
+        // draw volume percentage
+        char volumeText[32];
+        sprintf(volumeText, "%d%%", (int)(volumeControl->currentVolume * 100));
+        DrawText(volumeText,
+                volumeControl->sliderBounds.x + volumeControl->sliderBounds.width + 10,
+                volumeControl->sliderBounds.y - 25,
+                20,
+                DARKGRAY);
+    }
+}
+
+void unloadVolumeControl(VolumeControl *volumeControl) {
+    UnloadTexture(volumeControl->iconTexture);
+}
+
+float custom_clamp(float value, float min, float max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
 }

@@ -21,6 +21,8 @@
 // Naive Bayes Model
 #define TICTACTOE_DATASET 958
 #define TRAIN_TEST 0.8
+#define TRAIN_SIZE ((int)(TICTACTOE_DATASET * TRAIN_TEST))
+#define TEST_SIZE (TICTACTOE_DATASET - TRAIN_SIZE)
 
 // game states
 typedef enum {
@@ -113,6 +115,7 @@ int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, ch
 
 int nb_load_dataset(const char *filename);
 void split_dataset();
+void cleanup_datasets();
 void train_nb();
 int nb_predict(char board[BOARD_SIZE][BOARD_SIZE]);
 void nb_ai_move(char board[BOARD_SIZE][BOARD_SIZE]);
@@ -774,6 +777,7 @@ int main(void) {
 
         EndDrawing();
     }
+    cleanup_datasets();
     unload_sound_effect(&click_sound);
     unload_sound_effect(&coin_sound);
     unload_sound_effect(&roundend_sound);
@@ -923,19 +927,17 @@ void updateScore(Score *score, bool gameWon, char currentPlayer) {
 }
 
 void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty) {
-    // Easy difficulty: random move
+    // level 1 difficulty: random move
     if (difficulty == EASY) {
         makeRandomMove(board, ai);
         return;
     }
 
-    // Medium difficulty: 50% optimal move, 50% random
-    if (difficulty == MEDIUM && (rand() % 10) < 5) {
-        makeRandomMove(board, ai);
-        return;
-    }
+    // level 2 difficuly: naive bayes model
 
-    // Hard difficulty: 80% optimal move, 20% random
+    // level 3 difficulty: linear reg model
+
+    // level 4 difficulty: 80% optimal move, 20% random
     if (difficulty == HARD && (rand() % 10) < 2){
         makeRandomMove(board, ai);
         return;
@@ -1040,8 +1042,8 @@ typedef struct
 } NavieBayesModel;
 
 MoveData_nb dataset[TICTACTOE_DATASET];
-MoveData_nb train_set[(int)(TICTACTOE_DATASET * TRAIN_TEST)];
-MoveData_nb test_set[TICTACTOE_DATASET - (int)(TICTACTOE_DATASET * TRAIN_TEST)];
+MoveData_nb *train_set = NULL;
+MoveData_nb *test_set = NULL;
 NavieBayesModel nb_model;
 
 int nb_load_dataset(const char *filename){
@@ -1064,21 +1066,38 @@ int nb_load_dataset(const char *filename){
     return 0;
 }
 
-// Split the dataset into train and test sets based on TRAIN_TEST
 void split_dataset() 
 {
-    int train_size = (int)(TICTACTOE_DATASET * TRAIN_TEST);
+    // Allocate memory for train and test sets
+    train_set = (MoveData_nb *)malloc(TRAIN_SIZE * sizeof(MoveData_nb));
+    test_set = (MoveData_nb *)malloc(TEST_SIZE * sizeof(MoveData_nb));
+    
+    if (!train_set || !test_set) {
+        printf("Memory allocation failed!\n");
+        exit(1);
+    }
     
     // Fill training set up to train_size
-    for (int i = 0; i < train_size; i++) 
+    for (int i = 0; i < TRAIN_SIZE; i++) 
     {
         train_set[i] = dataset[i];
     }
 
     // Put remaining data into the test set
-    for (int i = train_size; i < TICTACTOE_DATASET; i++) 
+    for (int i = TRAIN_SIZE; i < TICTACTOE_DATASET; i++) 
     {
-        test_set[i - train_size] = dataset[i];
+        test_set[i - TRAIN_SIZE] = dataset[i];
+    }
+}
+
+void cleanup_datasets() {
+    if (train_set) {
+        free(train_set);
+        train_set = NULL;
+    }
+    if (test_set) {
+        free(test_set);
+        test_set = NULL;
     }
 }
 
@@ -1170,49 +1189,81 @@ void nb_ai_move(char board[BOARD_SIZE][BOARD_SIZE])
 {
     int best_row = -1;
     int best_col = -1;
-    double highest_prob = -1.0;
-
-    // Check each possible move on the board to see which has the highest chance to win
-    for (int row = 0; row < BOARD_SIZE; row++)
-    {
-        for (int col = 0; col < BOARD_SIZE; col++) 
-        {
-            if (board[row][col] == ' ') // Empty cell
-            { 
-                board[row][col] = 'O'; // Make the move tentatively
-
-                // Predict the outcome if this move is made on empty cell
-                double win_prob = nb_model.prob_win; // Use Naive Bayes winning probability
-                if (nb_predict(board) == 1) 
-                { 
-                    win_prob *= nb_model.prob_win; // AI's predicted move leads to a win
-                } 
-
-                else 
-                {
-                    win_prob *= nb_model.prob_lose;
+    double best_score = -1.0;
+    
+    // try each possible move
+    for (int row = 0; row < BOARD_SIZE; row++) {
+        for (int col = 0; col < BOARD_SIZE; col++) {
+            if (board[row][col] == ' ') {
+                // Make temporary move
+                board[row][col] = 'O';
+                
+                // calculate win probability for this move
+                double win_prob = 1.0;
+                
+                // calculate probability based on board state
+                for (int r = 0; r < BOARD_SIZE; r++) {
+                    for (int c = 0; c < BOARD_SIZE; c++) {
+                        if (board[r][c] == 'X') {
+                            win_prob *= nb_model.prob_x[r][c][1];
+                        } else if (board[r][c] == 'O') {
+                            win_prob *= nb_model.prob_o[r][c][1];
+                        } else {
+                            win_prob *= nb_model.prob_blank[r][c][1];
+                        }
+                    }
                 }
-
-                // Track the move with the highest winning probability
-                if (win_prob > highest_prob) 
-                {
-                    highest_prob = win_prob;
+                
+                // consider if this move blocks opponent win
+                board[row][col] = 'X';  // temporarily place opponent's move
+                double opponent_win_prob = 1.0;
+                
+                for (int r = 0; r < BOARD_SIZE; r++) {
+                    for (int c = 0; c < BOARD_SIZE; c++) {
+                        if (board[r][c] == 'X') {
+                            opponent_win_prob *= nb_model.prob_x[r][c][1];
+                        } else if (board[r][c] == 'O') {
+                            opponent_win_prob *= nb_model.prob_o[r][c][1];
+                        } else {
+                            opponent_win_prob *= nb_model.prob_blank[r][c][1];
+                        }
+                    }
+                }
+                
+                // calculate final score for this move
+                // consider both winning probability and blocking opponent
+                double move_score = win_prob + (opponent_win_prob * 0.8);  // Weight blocking slightly less
+                
+                // Check if this is immediate win or block
+                board[row][col] = 'O';
+                if (checkWin(board, 'O')) {
+                    move_score = INFINITY;  // prioritize winning moves
+                }
+                board[row][col] = 'X';
+                if (checkWin(board, 'X')) {
+                    move_score = INFINITY - 1;  // prioritize blocking opponent's winning moves
+                }
+                
+                // undo temporary move
+                board[row][col] = ' ';
+                
+                // update best move if this is better
+                if (move_score > best_score) {
+                    best_score = move_score;
                     best_row = row;
                     best_col = col;
                 }
-
-                board[row][col] = ' '; // Undo the move after evaluation
             }
         }
     }
-
-
-    // Make the best move found
-    if (best_row != -1 && best_col != -1) 
-    {
+    
+    // make the best move found
+    if (best_row != -1 && best_col != -1) {
         board[best_row][best_col] = 'O';
-    } 
-
+    } else {
+        // fallback to making a random move if no good move found
+        makeRandomMove(board, 'O');
+    }
 }
 
 void initVolumeControl(VolumeControl *volumeControl) {

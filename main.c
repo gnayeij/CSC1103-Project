@@ -117,7 +117,7 @@ float custom_clamp(float value, float min, float max);
 
 void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty);
 void makeRandomMove(char board[BOARD_SIZE][BOARD_SIZE], char player);
-int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai);
+int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai, int alpha, int beta);
 
 int nb_load_dataset(const char *filename);
 void split_dataset();
@@ -1062,12 +1062,14 @@ void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty) {
     // Use minimax to find best move
     int bestScore = -1000;
     int bestMove[2] = {-1, -1};
+    int alpha = -1000; // Initial alpha value
+    int beta = 1000;
 
     for (int i = 0; i < BOARD_SIZE; i++) {
         for (int j = 0; j < BOARD_SIZE; j++) {
             if (board[i][j] == ' ') {
                 board[i][j] = ai;
-                int score = minimax(board, 0, false, 'X', ai);
+                int score = minimax(board, 0, false, 'X', ai, alpha, beta);
                 board[i][j] = ' ';
 
                 if (score > bestScore) {
@@ -1083,7 +1085,6 @@ void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty) {
         makeMove(board, bestMove[0], bestMove[1], ai);
     }
 }
-
 void makeRandomMove(char board[BOARD_SIZE][BOARD_SIZE], char player)
 {
     int available[BOARD_SIZE * BOARD_SIZE][2];
@@ -1110,7 +1111,7 @@ void makeRandomMove(char board[BOARD_SIZE][BOARD_SIZE], char player)
     }
 }
 
-int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai) {
+int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai, int alpha, int beta) {
     // Check terminal states
     if (checkWin(board, ai)) return 10 - depth;
     if (checkWin(board, player)) return depth - 10;
@@ -1122,9 +1123,13 @@ int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, ch
             for (int j = 0; j < BOARD_SIZE; j++) {
                 if (board[i][j] == ' ') {
                     board[i][j] = ai;
-                    int score = minimax(board, depth + 1, false, player, ai);
+                    int score = minimax(board, depth + 1, false, player, ai, alpha, beta);
                     board[i][j] = ' ';
                     bestScore = (score > bestScore) ? score : bestScore;
+                    alpha = (alpha > bestScore) ? alpha : bestScore; // Update alpha
+                    if (beta <= alpha) { // Beta cut-off
+                        break;
+                    }
                 }
             }
         }
@@ -1135,9 +1140,13 @@ int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, ch
             for (int j = 0; j < BOARD_SIZE; j++) {
                 if (board[i][j] == ' ') {
                     board[i][j] = player;
-                    int score = minimax(board, depth + 1, true, player, ai);
+                    int score = minimax(board, depth + 1, true, player, ai, alpha, beta);
                     board[i][j] = ' ';
                     bestScore = (score < bestScore) ? score : bestScore;
+                    beta = (beta < bestScore) ? beta : bestScore; // Update beta
+                    if (beta <= alpha) { // Alpha cut-off
+                        break;
+                    }
                 }
             }
         }

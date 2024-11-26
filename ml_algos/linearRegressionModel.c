@@ -10,21 +10,6 @@
 #define DATASET_SIZE 958
 #define BOARD_TOTAL_SIZE 9
 
-
-void print_board(char board[SIZE][SIZE])
-{
-    // print board
-    for (int i = 0; i < SIZE; i++)
-    {
-        printf("\n");
-        for (int j = 0; j < SIZE; j++)
-        {
-            printf("%c", board[i][j]);
-        }
-    }
-    printf("\n");
-}
-
 double eval_approximation(int features[7], double weights[7])
 {
     double score = 0.0;
@@ -141,95 +126,85 @@ void board_to_features(char board[SIZE][SIZE], int features[7], char type)
     }
 
     for (int i = 0; i < 2; i++)
+    {
+        // diag check
+        int own_diag = 0, en_diag = 0, emp_diag = 0;
+        char diagonal;
+        for (int j = 0; j < SIZE; j++)
         {
-            // diag check
-            int own_diag = 0, en_diag = 0, emp_diag = 0;
-            char diagonal;
-            for (int j = 0; j < SIZE; j++)
+            if (i == 0)
             {
-                if (i == 0)
-                {
-                    diagonal = board[2 - j][j];
-                }
-                else
-                {
-                    diagonal = board[j][j];
-                }
-                if (diagonal == type)
-                {
-                    own_diag++;
-                }
-                else if (diagonal == opponent_type)
-                {
-                    en_diag++;
-                }
-                else
-                {
-                    emp_diag++;
-                }
+                diagonal = board[2 - j][j];
             }
-            if (own_diag == 2 && emp_diag == 1)
+            else
             {
-                features[1]++;
+                diagonal = board[j][j];
             }
-            if (en_diag == 2 && emp_diag == 1)
+            if (diagonal == type)
             {
-                features[2]++;
+                own_diag++;
             }
-            if (own_diag == 1 && emp_diag == 2)
+            else if (diagonal == opponent_type)
             {
-                features[5]++;
+                en_diag++;
             }
-            if (own_diag == 3)
+            else
             {
-                features[6]++;
+                emp_diag++;
             }
         }
+        if (own_diag == 2 && emp_diag == 1)
+        {
+            features[1]++;
+        }
+        if (en_diag == 2 && emp_diag == 1)
+        {
+            features[2]++;
+        }
+        if (own_diag == 1 && emp_diag == 2)
+        {
+            features[5]++;
+        }
+        if (own_diag == 3)
+        {
+            features[6]++;
+        }
+    }
 }
 
 void initialize_weights(double weights[7])
 {
     for (int i = 0; i < 7; i++)
     {
-        weights[i] = ((double)rand() / RAND_MAX) * 0.2 - 0.1; // Random values between -0.1 and 0.1
+        weights[i] = ((double)rand() / RAND_MAX) * 0.2 - 0.1;
     }
 }
-
 
 int predict(char board[SIZE][SIZE], LinearRegressionModel model, char type)
 {
     int counter = 0;
     char(*boards)[SIZE][SIZE] = malloc(BOARD_TOTAL_SIZE * sizeof(char[SIZE][SIZE]));
     int *moves = malloc(BOARD_TOTAL_SIZE * sizeof(int));
-    // print_board(board);
     for (int i = 0; i < SIZE; i++)
     {
         for (int j = 0; j < SIZE; j++)
         {
             if (board[i][j] == 'B' || board[i][j] == ' ')
             {
-                // print
-                // printf("blank found at index: %d %d\n", i, j);
+
                 memcpy(boards[counter], board, sizeof(char[SIZE][SIZE]));
                 boards[counter][i][j] = type;
-                // print moved board
-                // printf("New board: ");
-                // print_board(boards[counter]);
                 moves[counter] = i * 3 + j;
-                // printf("move: %d\n", moves[i]);
                 counter++;
             }
         }
     }
-
-    // initialize a low value
     double val = -99999999;
     int best_move = -1;
     for (int i = 0; i < counter; i++)
     {
         int features[7] = {1, 0, 0, 0, 0, 0, 0};
         board_to_features(boards[i], features, type);
-
         double prediction = eval_approximation(features, model.weights);
         if (val < prediction)
         {
@@ -242,32 +217,26 @@ int predict(char board[SIZE][SIZE], LinearRegressionModel model, char type)
 
 void train(LinearRegressionModel *model, int verbose)
 {
-    printf("Starting training with following parameters: Learning Rate: %.4f, Epochs: %d...\n",  model->learning_rate, model->epochs);
+    printf("Starting training with following parameters: Learning Rate: %.4f, Epochs: %d...\n", model->learning_rate, model->epochs);
     int num_samples = DATASET_SIZE * 0.8;
 
     for (int epoch = 0; epoch < model->epochs; epoch++)
     {
-        // printf("Epoch: %d\n",epoch);
         double total_loss = 0.0;
         // shuffle dataset
         shuffle_data(model->dataset, DATASET_SIZE);
-        // printf("After shuffle\n");
         for (int i = 0; i < num_samples; i++)
         {
             int features[7] = {1, 0, 0, 0, 0, 0, 0};
             board_to_features(model->dataset[i].board, features, 'x');
-
             int predicted_move = predict(model->dataset[i].board, *model, 'x');
-            int error = model->dataset[i].outcome - predicted_move;
+            int error = predicted_move - model->dataset[i].outcome;
             total_loss += error * error;
 
             // weight update
             for (int j = 0; j < 7; j++)
             {
                 model->weights[j] += model->learning_rate * (error * features[j] - 0.01 * model->weights[j]);
-
-
-                // printf("weight %d: feature: %d error: %d weight value: %.2f\n", j, features[j], error, model->weights[j]);
             }
         }
 
@@ -277,7 +246,7 @@ void train(LinearRegressionModel *model, int verbose)
             for (int j = 0; j < 7; j++)
             {
 
-                printf("%.2f ", model->weights[j]);
+                printf("%g ", model->weights[j]);
             }
             printf(" Epoch %d, Training loss for current epoch: %f\n", epoch, total_loss);
         }
@@ -289,7 +258,7 @@ void evaluate(LinearRegressionModel *model)
 {
     int num_samples = DATASET_SIZE * 0.2;
     int correct_predictions = 0;
-    int predictions[BOARD_TOTAL_SIZE] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    int outcomes[BOARD_TOTAL_SIZE][BOARD_TOTAL_SIZE] = {{0}};
 
     for (int i = DATASET_SIZE - num_samples; i < DATASET_SIZE; i++)
     {
@@ -302,14 +271,23 @@ void evaluate(LinearRegressionModel *model)
         {
             correct_predictions++;
         }
-        predictions[predicted_move]++;
+
+        outcomes[model->dataset[i].outcome][predicted_move]++;
     }
+
     double accuracy = (double)correct_predictions / num_samples * 100;
     printf("Accuracy for testing set: %.2f%%\n", accuracy);
-    printf("Number of picks per slot: ");
+
+    printf("Confusion Matrix for testing data: \n");
+    printf("Actual: 0   1   2   3   4   5   6   7   8\nP:\n");
     for (int i = 0; i < BOARD_TOTAL_SIZE; i++)
     {
-        printf("%d:%d ", i, predictions[i]);
+        printf("%i      ", i);
+        for (int j = 0; j < BOARD_TOTAL_SIZE; j++)
+        {
+            printf("%2i  ", outcomes[i][j]);
+        }
+        printf("\n");
     }
     printf("\n");
 }
@@ -325,7 +303,7 @@ void shuffle_data(MoveData *dataset, int num_samples)
     }
 }
 
-LinearRegressionModel *new_model(double bias, double learning_rate, int epochs)
+LinearRegressionModel *new_model(double learning_rate, int epochs)
 {
 
     MoveData dataset[DATASET_SIZE];
@@ -337,8 +315,7 @@ LinearRegressionModel *new_model(double bias, double learning_rate, int epochs)
         return NULL;
     }
 
-    srand(time(NULL));
-
+    srand(time(NULL));                   // setting seed for random based on current time
     shuffle_data(dataset, DATASET_SIZE); // shuffling data for randomness
     LinearRegressionModel *model = (LinearRegressionModel *)malloc(sizeof(LinearRegressionModel));
     model->weights = (double *)malloc(BOARD_TOTAL_SIZE * sizeof(double));

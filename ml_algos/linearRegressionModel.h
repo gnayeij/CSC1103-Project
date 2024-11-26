@@ -25,6 +25,6 @@ void evaluate(LinearRegressionModel *model);
 
 void shuffle_data(MoveData *dataset, int num_samples);
 
-LinearRegressionModel *new_model(double bias, double learning_rate, int epochs);
+LinearRegressionModel *new_model(double learning_rate, int epochs);
 
 #endif

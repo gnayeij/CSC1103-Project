@@ -1042,11 +1042,9 @@ void updateScore(Score *score, bool gameWon, char currentPlayer)
     }
 }
 
-void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty)
-{
+void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty) {
     // level 1 difficulty: random move
-    if (difficulty == EASY)
-    {
+    if (difficulty == EASY) {
         makeRandomMove(board, ai);
         return;
     }
@@ -1056,28 +1054,23 @@ void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty)
     // level 3 difficulty: linear reg model
 
     // level 4 difficulty: 80% optimal move, 20% random
-    if (difficulty == HARD && (rand() % 10) < 2)
-    {
+    if (difficulty == HARD && (rand() % 10) < 2){
         makeRandomMove(board, ai);
         return;
     }
 
     // Use minimax to find best move
-    int bestScore = 1000;
+    int bestScore = -1000;
     int bestMove[2] = {-1, -1};
 
-    for (int i = 0; i < BOARD_SIZE; i++)
-    {
-        for (int j = 0; j < BOARD_SIZE; j++)
-        {
-            if (board[i][j] == ' ')
-            {
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
+            if (board[i][j] == ' ') {
                 board[i][j] = ai;
-                int score = minimax(board, 0, true, 'X', ai);
+                int score = minimax(board, 0, false, 'X', ai);
                 board[i][j] = ' ';
 
-                if (score < bestScore)
-                {
+                if (score > bestScore) {
                     bestScore = score;
                     bestMove[0] = i;
                     bestMove[1] = j;
@@ -1086,8 +1079,7 @@ void aiMove(char board[BOARD_SIZE][BOARD_SIZE], char ai, int difficulty)
         }
     }
 
-    if (bestMove[0] != -1 && bestMove[1] != -1)
-    {
+    if (bestMove[0] != -1 && bestMove[1] != -1) {
         makeMove(board, bestMove[0], bestMove[1], ai);
     }
 }
@@ -1118,26 +1110,18 @@ void makeRandomMove(char board[BOARD_SIZE][BOARD_SIZE], char player)
     }
 }
 
-int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai)
-{
+int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, char player, char ai) {
     // Check terminal states
-    if (checkWin(board, ai))
-        return depth - 10;
-    if (checkWin(board, player))
-        return 10 - depth;
-    if (isBoardFull(board))
-        return 0;
+    if (checkWin(board, ai)) return 10 - depth;
+    if (checkWin(board, player)) return depth - 10;
+    if (isBoardFull(board)) return 0;
 
-    if (isMaximizing)
-    {
+    if (isMaximizing) {
         int bestScore = -1000;
-        for (int i = 0; i < BOARD_SIZE; i++)
-        {
-            for (int j = 0; j < BOARD_SIZE; j++)
-            {
-                if (board[i][j] == ' ')
-                {
-                    board[i][j] = player;
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            for (int j = 0; j < BOARD_SIZE; j++) {
+                if (board[i][j] == ' ') {
+                    board[i][j] = ai;
                     int score = minimax(board, depth + 1, false, player, ai);
                     board[i][j] = ' ';
                     bestScore = (score > bestScore) ? score : bestScore;
@@ -1145,17 +1129,12 @@ int minimax(char board[BOARD_SIZE][BOARD_SIZE], int depth, bool isMaximizing, ch
             }
         }
         return bestScore;
-    }
-    else
-    {
+    } else {
         int bestScore = 1000;
-        for (int i = 0; i < BOARD_SIZE; i++)
-        {
-            for (int j = 0; j < BOARD_SIZE; j++)
-            {
-                if (board[i][j] == ' ')
-                {
-                    board[i][j] = ai;
+        for (int i = 0; i < BOARD_SIZE; i++) {
+            for (int j = 0; j < BOARD_SIZE; j++) {
+                if (board[i][j] == ' ') {
+                    board[i][j] = player;
                     int score = minimax(board, depth + 1, true, player, ai);
                     board[i][j] = ' ';
                     bestScore = (score < bestScore) ? score : bestScore;

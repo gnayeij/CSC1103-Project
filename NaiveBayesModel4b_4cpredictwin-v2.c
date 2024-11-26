@@ -1,4 +1,3 @@
-// Naive Bayes Model
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +6,7 @@
 #define TICTACTOE_DATASET 958
 #define TRAIN_TEST 0.8
 #define BOARD_SIZE 3
+
 typedef struct 
 {
     char board[BOARD_SIZE][BOARD_SIZE];
@@ -29,7 +29,12 @@ MoveData train_set[(int)(TICTACTOE_DATASET * TRAIN_TEST)];
 MoveData test_set[TICTACTOE_DATASET - (int)(TICTACTOE_DATASET * TRAIN_TEST)];
 NavieBayesModel nb_model;
 
-int nb_load_dataset(const char *filename){
+// Global win counter
+int ai_win_counter = 0;
+
+// Load Tic Tac Toe Dataset
+int nb_load_dataset(const char *filename)
+{
     FILE *file = fopen(filename, "r");
     if (!file) 
     {
@@ -148,7 +153,33 @@ int nb_predict(char board[BOARD_SIZE][BOARD_SIZE])
         }
     }
 
-    return win_prob > lose_prob ? 1 : 0; // Return '1' for win, '0' for lose
+    // Increment win counter if the prediction is a win
+    if (win_prob > lose_prob) 
+    {
+        ai_win_counter++;
+        return 1; // Win
+    } 
+    else 
+    {
+        return 0; // Lose
+    }
+}
+
+// Calculate the accuracy for the given dataset
+double calculate_accuracy(MoveData *data_set, int size, int is_training) 
+{
+    int correct_predictions = 0;
+
+    for (int i = 0; i < size; i++) 
+    {
+        int predicted_outcome = nb_predict(data_set[i].board);
+        if (predicted_outcome == data_set[i].outcome) 
+        {
+            correct_predictions++;
+        }
+    }
+
+    return ((double)correct_predictions / size) * 100.0;
 }
 
 void nb_ai_move(char board[BOARD_SIZE][BOARD_SIZE]) 
@@ -166,19 +197,16 @@ void nb_ai_move(char board[BOARD_SIZE][BOARD_SIZE])
             { 
                 board[row][col] = 'O'; // Make the move tentatively
 
-                // Predict the outcome if this move is made on empty cell
-                double win_prob = nb_model.prob_win; // Use Naive Bayes winning probability
+                double win_prob = nb_model.prob_win;
                 if (nb_predict(board) == 1) 
                 { 
-                    win_prob *= nb_model.prob_win; // AI's predicted move leads to a win
+                    win_prob *= nb_model.prob_win; 
                 } 
-
                 else 
                 {
                     win_prob *= nb_model.prob_lose;
                 }
 
-                // Track the move with the highest winning probability
                 if (win_prob > highest_prob) 
                 {
                     highest_prob = win_prob;
@@ -191,13 +219,10 @@ void nb_ai_move(char board[BOARD_SIZE][BOARD_SIZE])
         }
     }
 
-
-    // Make the best move found
     if (best_row != -1 && best_col != -1) 
     {
         board[best_row][best_col] = 'O';
     } 
-
 }
 
 int main() 
@@ -210,17 +235,45 @@ int main()
     split_dataset();
     train_nb();
 
+    int train_size = (int)(TICTACTOE_DATASET * TRAIN_TEST);
+    double train_accuracy = calculate_accuracy(train_set, train_size, 1);
+
+    int test_size = TICTACTOE_DATASET - train_size;
+    double test_accuracy = calculate_accuracy(test_set, test_size, 0);
+
+    printf("Training Accuracy: %.2f%%\n", train_accuracy);
+    printf("Test Accuracy: %.2f%%\n", test_accuracy);
+    printf("AI Win Counter: %d\n", ai_win_counter);
+
+    // Example for AI move
     char test_board[BOARD_SIZE][BOARD_SIZE] = 
     {
         {'X', 'O', 'X'},
         {'O', 'X', 'O'},
         {' ', ' ', ' '}
     };
-    printf(test_board);
-    printf("\n");
+    
+    printf("Board before AI move:\n");
+    for (int i = 0; i < BOARD_SIZE; i++) 
+    {
+        for (int j = 0; j < BOARD_SIZE; j++) 
+        {
+            printf("%c ", test_board[i][j]);
+        }
+        printf("\n");
+    }
+
     nb_ai_move(test_board);
-    printf(test_board);
-    //printf("Prediction for the given Tic Tac Toe board: %s\n", prediction == 1 ? "Win" : "Lose");
+
+    printf("Board after AI move:\n");
+    for (int i = 0; i < BOARD_SIZE; i++) 
+    {
+        for (int j = 0; j < BOARD_SIZE; j++) 
+        {
+            printf("%c ", test_board[i][j]);
+        }
+        printf("\n");
+    }
 
     return 0;
 }

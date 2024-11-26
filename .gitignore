@@ -3,5 +3,3 @@ include/raylib.h
 lib/
 
 .vscode
-
-*.exe

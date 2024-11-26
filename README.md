@@ -24,4 +24,10 @@ How it Works:
 - If you get unauthorizedAccess error when running the .ps1 file, open up a powershell terminal and run this: "Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser" 
 
 To note: 
-- I add the game.exe file into .gitignore.
+- Finalised game.exe has been added into repo.
+
+To run game:
+- run game.exe
+
+If need to recompile game:
+- run script file: .\run.ps1
